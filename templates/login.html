@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Login | Ficha OCR{% endblock %}
+{% block content %}
+<section class="card auth-card">
+  <div>
+    <span class="eyebrow">Controle de documentos</span>
+    <h2>Acesse o sistema</h2>
+    <p class="muted">Faça login para gerenciar uploads de PDFs e usuários.</p>
+  </div>
+
+  <form method="post" class="form-grid">
+    <label>
+      Usuário
+      <input type="text" name="username" placeholder="Digite seu usuário" required>
+    </label>
+
+    <label>
+      Senha
+      <input type="password" name="password" placeholder="Digite sua senha" required>
+    </label>
+
+    <button type="submit">Entrar</button>
+  </form>
+
+  <p class="hint">Acesso inicial do administrador: <code>admin / admin123</code>.</p>
+</section>
+{% endblock %}

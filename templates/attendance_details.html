@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Atendimento {{ attendance_number }} | Ficha OCR{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="section-header">
+    <div>
+      <span class="eyebrow">Dados do atendimento</span>
+      <h2>Atendimento {{ attendance_number }}</h2>
+      <p class="muted">A consulta Oracle usa o número capturado em formatos com e sem zeros à esquerda.</p>
+    </div>
+  </div>
+
+  {% if oracle_error %}
+    <div class="flash flash-danger">{{ oracle_error }}</div>
+  {% endif %}
+
+  {% if summary %}
+    <div class="detail-grid">
+      <article class="card detail-card">
+        <h3>Paciente</h3>
+        <p><strong>Nome:</strong> {{ summary['nm_paciente'] }}</p>
+        <p><strong>Paciente:</strong> {{ summary['cd_paciente'] }}</p>
+        <p><strong>Data atendimento:</strong> {{ summary['dt_atendimento'] }}</p>
+      </article>
+      <article class="card detail-card">
+        <h3>Classificação</h3>
+        <p><strong>Risco:</strong> {{ summary['classificacao_risco'] }}</p>
+        <p><strong>Queixa principal:</strong> {{ summary['queixa_principal'] }}</p>
+      </article>
+      <article class="card detail-card">
+        <h3>Sinais vitais</h3>
+        <p><strong>Temperatura:</strong> {{ summary['temperatura'] }}</p>
+        <p><strong>FC:</strong> {{ summary['frequencia_cardiaca'] }}</p>
+        <p><strong>PA Sistólica:</strong> {{ summary['pressao_sistolica'] }}</p>
+        <p><strong>PA Diastólica:</strong> {{ summary['pas_pad'] }}</p>
+        <p><strong>SpO2:</strong> {{ summary['spo2'] }}</p>
+        <p><strong>Glicemia:</strong> {{ summary['glicemia'] }}</p>
+      </article>
+    </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Prescrição médica / solicitações</h2>
+      <p class="muted">Consulta Oracle filtrada pelo número do atendimento.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Data/Hora</th>
+          <th>Produto</th>
+          <th>Qtde</th>
+          <th>Classificação</th>
+          <th>Forma Aplicação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in prescriptions %}
+        <tr>
+          <td>{{ item['nm_paciente'] }}</td>
+          <td>{{ item['data_hora'] }}</td>
+          <td>{{ item['ds_produto'] }}</td>
+          <td>{{ item['qt_solicitado'] }}</td>
+          <td>{{ item['cd_cor_referencia'] }}</td>
+          <td>{{ item['cd_for_apl'] }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="empty-state">Nenhum dado de prescrição encontrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Medicamentos / retorno</h2>
+      <p class="muted">Itens retornados pela consulta clínica do atendimento.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Atendimento</th>
+          <th>Queixa</th>
+          <th>Risco</th>
+          <th>Medicamento</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in attendance_rows %}
+        <tr>
+          <td>{{ item['nm_paciente'] }}</td>
+          <td>{{ attendance_number }}</td>
+          <td>{{ item['queixa_principal'] }}</td>
+          <td>{{ item['classificacao_risco'] }}</td>
+          <td>{{ item['medicamento'] }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="empty-state">Nenhum dado clínico encontrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

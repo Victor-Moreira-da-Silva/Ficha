@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Enviar PDF | Ficha OCR{% endblock %}
+{% block content %}
+<section class="card narrow-card">
+  <div class="section-header column">
+    <div>
+      <span class="eyebrow">Recepção e Admin</span>
+      <h2>Enviar PDF para OCR</h2>
+    </div>
+    <p class="muted">Recepção e administradores podem enviar PDFs. O sistema prioriza a região superior direita do documento, logo abaixo do código de barras, para localizar o número do atendimento e salva o arquivo com esse número.</p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-grid">
+    <label>
+      Arquivo PDF
+      <input type="file" name="pdf_file" accept="application/pdf" required>
+    </label>
+
+    <button type="submit">Processar arquivo</button>
+  </form>
+</section>
+{% endblock %}

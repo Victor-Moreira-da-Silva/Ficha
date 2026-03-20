@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard | Ficha OCR{% endblock %}
+{% block content %}
+<section class="hero-grid">
+  <article class="card stat-card">
+    <span class="eyebrow">Usuários</span>
+    <strong>{{ user_count }}</strong>
+    <p class="muted">Perfis cadastrados no sistema.</p>
+  </article>
+  <article class="card stat-card">
+    <span class="eyebrow">PDFs processados</span>
+    <strong>{{ upload_count }}</strong>
+    <p class="muted">Arquivos organizados por número de atendimento.</p>
+  </article>
+  <article class="card stat-card">
+    <span class="eyebrow">Seu perfil</span>
+    <strong>{{ user['role']|capitalize }}</strong>
+    <p class="muted">Permissões aplicadas conforme o nível de acesso.</p>
+  </article>
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Últimos uploads</h2>
+      <p class="muted">Histórico recente de PDFs processados pelo OCR.</p>
+    </div>
+    {% if current_user['role'] in ['recepcao', 'admin'] %}
+      <a class="button-link" href="{{ url_for('upload_pdf') }}">Novo upload</a>
+    {% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Atendimento</th>
+          <th>Arquivo</th>
+          <th>Enviado por</th>
+          <th>Data</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in uploads %}
+        <tr>
+          <td>{{ item['attendance_number'] }}</td>
+          <td>{{ item['original_filename'] }}</td>
+          <td>{{ item['uploader'] }}</td>
+          <td>{{ item['created_at'] }}</td>
+          <td>
+            {% if current_user['role'] in ['faturamento', 'admin'] %}
+              <a href="{{ url_for('serve_file', relative_path=item['stored_path']) }}">Baixar</a>
+              <a href="{{ url_for('attendance_details', attendance_number=item['attendance_number']) }}">Detalhes</a>
+            {% else %}
+              <span class="muted">Sem acesso</span>
+            {% endif %}
+            {% if current_user['role'] == 'admin' %}
+              <form method="post" action="{{ url_for('delete_upload', upload_id=item['id']) }}" class="inline-form">
+                <button type="submit" class="danger-button">Excluir</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="empty-state">Nenhum upload realizado até o momento.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

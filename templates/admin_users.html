@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}Usuários | Ficha OCR{% endblock %}
+{% block content %}
+<section class="card page-intro">
+  <div class="section-header column">
+    <div>
+      <span class="eyebrow">Administração</span>
+      <h2>Cadastro de usuários</h2>
+    </div>
+    <p class="muted">Gerencie os acessos sem sair da tela. Após cada ação, o sistema retorna para a área correspondente.</p>
+  </div>
+</section>
+
+<section class="grid-2">
+  <article class="card" id="cadastro-usuario">
+    <div class="section-header column">
+      <div>
+        <span class="eyebrow">Administração</span>
+        <h2>Criar usuário</h2>
+      </div>
+      <p class="muted">Cadastre usuários com perfil de recepção, faturamento ou administrador.</p>
+    </div>
+    <form method="post" class="form-grid">
+      <input type="hidden" name="action" value="create">
+
+      <label>
+        Usuário
+        <input type="text" name="username" required>
+      </label>
+
+      <label>
+        Senha inicial
+        <input type="password" name="password" required>
+      </label>
+
+      <label>
+        Perfil
+        <select name="role" required>
+          <option value="recepcao">Recepção</option>
+          <option value="faturamento">Faturamento</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+
+      <button type="submit">Criar usuário</button>
+    </form>
+  </article>
+
+  <article class="card" id="alterar-senha">
+    <div class="section-header column">
+      <div>
+        <span class="eyebrow">Administração</span>
+        <h2>Alterar senha</h2>
+      </div>
+      <p class="muted">Selecione um usuário e defina uma nova senha.</p>
+    </div>
+    <form method="post" class="form-grid">
+      <input type="hidden" name="action" value="change_password">
+
+      <label>
+        Usuário
+        <select name="user_id" required>
+          {% for user in users %}
+          <option value="{{ user['id'] }}">{{ user['username'] }} ({{ user['role'] }})</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label>
+        Nova senha
+        <input type="password" name="new_password" required>
+      </label>
+
+      <button type="submit">Atualizar senha</button>
+    </form>
+  </article>
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Usuários cadastrados</h2>
+      <p class="muted">Relação completa dos usuários do sistema.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th>Perfil</th>
+          <th>Criado em</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>{{ user['username'] }}</td>
+          <td>{{ user['role'] }}</td>
+          <td>{{ user['created_at'] }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="3" class="empty-state">Nenhum usuário cadastrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
