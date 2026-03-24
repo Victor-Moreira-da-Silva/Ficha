@@ -132,7 +132,8 @@ class FichaAppTestCase(unittest.TestCase):
 
     def test_build_oracle_params_normalizes_leading_zeros(self):
         params = ficha_app.build_oracle_params("00180627")
-
+        
+        self.assertEqual(params["attendance_number"], 180627)
         self.assertEqual(params["attendance_number_str"], "180627")
         self.assertEqual(params["attendance_number_num"], 180627)
         self.assertEqual(params["attendance_length"], 8)
@@ -271,6 +272,23 @@ class FichaAppTestCase(unittest.TestCase):
                 ("778899",),
             ).fetchone()
         self.assertEqual(rows["total"], 2)
+
+    def test_recepcao_can_preview_pdf_via_files_route(self):
+        self.create_user("recep_preview", "senha123", "recepcao")
+        self.login("recep_preview", "senha123")
+
+        attendance = "180628"
+        pdf_dir = self.upload_root / attendance
+        pdf_dir.mkdir(parents=True, exist_ok=True)
+        pdf_file = pdf_dir / f"{attendance}-signature-base.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 preview")
+
+        response = self.client.get(
+            f"/files/storage/atendimentos/{attendance}/{attendance}-signature-base.pdf"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("attachment", response.headers.get("Content-Disposition", "").lower())
 
     def test_admin_users_page_renders_after_click(self):
         self.login("admin", "admin123")

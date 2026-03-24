@@ -1008,6 +1008,7 @@ def build_oracle_params(attendance_number: str) -> dict:
     print("DEBUG atendimento:", repr(normalized_str))
 
     return {
+        "attendance_number": int(normalized_str),
         "attendance_number_str": normalized_str,
         "attendance_number_num": int(normalized_str),  # 🔥 ESSENCIAL
         "attendance_length": len(original_digits) if original_digits else len(raw_value),
@@ -1663,10 +1664,10 @@ def manage_ocr_settings():
 
 @app.route("/files/<path:relative_path>")
 @login_required
-@role_required("faturamento", "admin")
+@role_required("recepcao", "faturamento", "admin")
 def serve_file(relative_path: str):
     file_path = BASE_DIR / relative_path
-    return send_from_directory(file_path.parent, file_path.name, as_attachment=True)
+    return send_from_directory(file_path.parent, file_path.name, as_attachment=False)
 
 @app.route("/controle_pacientes", methods=["GET", "POST"])
 @login_required
