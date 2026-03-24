@@ -200,6 +200,56 @@ class FichaAppTestCase(unittest.TestCase):
         response = self.client.get("/upload", follow_redirects=True)
         self.assertIn("Enviar PDF para OCR".encode(), response.data)
 
+        self.assertIn("Assinatura eletrônica".encode(), response.data)
+
+    def test_recepcao_can_generate_online_signed_pdf_from_existing_upload(self):
+        self.create_user("recep_assina", "senha123", "recepcao")
+        self.login("recep_assina", "senha123")
+
+        source_dir = self.upload_root / "778899"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        source_file = source_dir / "778899.pdf"
+        source_file.write_bytes(b"%PDF-1.4 base")
+
+        with ficha_app.app.app_context():
+            db = ficha_app.get_db()
+            user = db.execute(
+                "SELECT id FROM users WHERE username = ?",
+                ("recep_assina",),
+            ).fetchone()
+            db.execute(
+                """
+                INSERT INTO uploads (original_filename, stored_path, attendance_number, uploaded_by)
+                VALUES (?, ?, ?, ?)
+                """,
+                ("base.pdf", "storage/atendimentos/778899/778899.pdf", "778899", user["id"]),
+            )
+            db.commit()
+
+        original_merge = ficha_app.merge_signature_into_pdf
+        ficha_app.merge_signature_into_pdf = lambda _src, dst, _sig: dst.write_bytes(b"%PDF-1.4 signed")
+        try:
+            response = self.client.post(
+                "/upload",
+                data={
+                    "action": "online_signature",
+                    "attendance_number": "778899",
+                    "signature_data": "data:image/png;base64,ZmFrZQ==",
+                },
+                follow_redirects=True,
+            )
+        finally:
+            ficha_app.merge_signature_into_pdf = original_merge
+
+        self.assertIn("Documento assinado e enviado com sucesso".encode(), response.data)
+
+        with ficha_app.app.app_context():
+            rows = ficha_app.get_db().execute(
+                "SELECT COUNT(*) AS total FROM uploads WHERE attendance_number = ?",
+                ("778899",),
+            ).fetchone()
+        self.assertEqual(rows["total"], 2)
+
     def test_admin_users_page_renders_after_click(self):
         self.login("admin", "admin123")
         response = self.client.get("/admin/users", follow_redirects=True)

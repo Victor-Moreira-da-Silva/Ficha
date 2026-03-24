@@ -2,7 +2,9 @@ import os
 import re
 import shutil
 import sqlite3
+import base64
 from functools import wraps
+from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,6 +20,7 @@ from flask import (
     session,
     url_for,
 )
+from PIL import Image
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -308,6 +311,37 @@ ORDER BY
     TRUNC(b.dt_atendimento),
     prd.ds_produto
 """
+
+ONLINE_SIGNATURE_QUERY = """
+SELECT
+    a.CD_ATENDIMENTO,
+    a.DT_ATENDIMENTO,
+    a.HR_ATENDIMENTO,
+    p.NM_PACIENTE,
+    p.DT_NASCIMENTO,
+    p.TP_SEXO,
+    p.NR_CPF,
+    p.NR_CNS,
+    p.DS_ENDERECO,
+    p.NR_ENDERECO,
+    p.NM_BAIRRO,
+    p.NR_CEP,
+    p.NR_SAME,
+    p.NR_FONE,
+    p.NM_MAE,
+    p.NM_PAI
+FROM ATENDIME a, PACIENTE p
+WHERE a.CD_PACIENTE = p.CD_PACIENTE
+AND a.CD_ATENDIMENTO = :attendance_number
+"""
+
+SIGNATURE_BOX_DEFAULT = {
+    "page_index": 0,
+    "x_ratio": 0.06,
+    "y_ratio": 0.54,
+    "width_ratio": 0.56,
+    "height_ratio": 0.05,
+}
 
 def resolve_tesseract_cmd() -> str | None:
     configured = os.environ.get("TESSERACT_CMD", "").strip()
@@ -641,6 +675,91 @@ def build_storage_path(attendance_number: str) -> Path:
 
     return candidate
 
+def to_stored_path(file_path: Path, attendance_number: str) -> str:
+    try:
+        return str(file_path.relative_to(BASE_DIR))
+    except ValueError:
+        return str(Path("storage") / "atendimentos" / attendance_number / file_path.name)
+
+
+def normalize_attendance_number(value: str) -> str:
+    only_digits = "".join(ch for ch in (value or "") if ch.isdigit())
+    return only_digits.lstrip("0") or "0"
+
+
+def find_latest_upload_for_attendance(attendance_number: str):
+    normalized = normalize_attendance_number(attendance_number)
+    uploads = get_db().execute(
+        """
+        SELECT id, original_filename, stored_path, attendance_number, created_at
+        FROM uploads
+        ORDER BY id DESC
+        """
+    ).fetchall()
+
+    for upload in uploads:
+        if normalize_attendance_number(upload["attendance_number"]) == normalized:
+            return upload
+    return None
+
+
+def decode_signature_data(signature_data_url: str):
+    if not signature_data_url or "," not in signature_data_url:
+        raise ValueError("Assinatura inválida. Tente assinar novamente.")
+    _, encoded = signature_data_url.split(",", 1)
+    try:
+        signature_bytes = base64.b64decode(encoded)
+    except Exception as exc:
+        raise ValueError("Não foi possível processar a assinatura enviada.") from exc
+
+    return Image.open(BytesIO(signature_bytes)).convert("RGBA")
+
+
+def merge_signature_into_pdf(
+    source_pdf_path: Path,
+    target_pdf_path: Path,
+    signature_data_url: str,
+    box: dict | None = None,
+):
+    if pdfium is None:
+        raise RuntimeError("Assinatura online indisponível: pypdfium2 não está instalado.")
+
+    signature_image = decode_signature_data(signature_data_url)
+    signature_box = box or SIGNATURE_BOX_DEFAULT
+
+    pdf = pdfium.PdfDocument(str(source_pdf_path))
+    pages = []
+    try:
+        for page_index in range(len(pdf)):
+            page = pdf[page_index]
+            bitmap = page.render(scale=2)
+            page_image = bitmap.to_pil().convert("RGB")
+
+            if page_index == signature_box["page_index"]:
+                overlay = Image.new("RGBA", page_image.size, (255, 255, 255, 0))
+                width, height = page_image.size
+                target_x = int(width * signature_box["x_ratio"])
+                target_y = int(height * signature_box["y_ratio"])
+                target_w = max(1, int(width * signature_box["width_ratio"]))
+                target_h = max(1, int(height * signature_box["height_ratio"]))
+                resized_signature = signature_image.resize((target_w, target_h))
+                overlay.paste(resized_signature, (target_x, target_y), resized_signature)
+                page_image = Image.alpha_composite(page_image.convert("RGBA"), overlay).convert("RGB")
+
+            pages.append(page_image)
+    finally:
+        pdf.close()
+
+    if not pages:
+        raise ValueError("O PDF informado não possui páginas para assinar.")
+
+    pages[0].save(
+        target_pdf_path,
+        "PDF",
+        resolution=300.0,
+        save_all=True,
+        append_images=pages[1:],
+    )
 
 def initialize_oracle_client():
     global ORACLE_CLIENT_INITIALIZED
@@ -658,6 +777,7 @@ def initialize_oracle_client():
 
 def build_oracle_params(attendance_number: str) -> dict:
     raw_value = attendance_number.strip()
+    original_digits = "".join(ch for ch in raw_value if ch.isdigit())
     normalized_str = raw_value.lstrip("0") or "0"
 
     print("DEBUG atendimento:", repr(normalized_str))
@@ -665,6 +785,7 @@ def build_oracle_params(attendance_number: str) -> dict:
     return {
         "attendance_number_str": normalized_str,
         "attendance_number_num": int(normalized_str),  # 🔥 ESSENCIAL
+        "attendance_length": len(original_digits) if original_digits else len(raw_value),
     }
 
 
@@ -981,7 +1102,33 @@ def dashboard():
 @login_required
 @role_required("recepcao", "admin")
 def upload_pdf():
+    selected_attendance = request.args.get("atendimento", "").strip()
+    selected_upload = None
+    patient_data = None
+
+    if selected_attendance:
+        selected_upload = find_latest_upload_for_attendance(selected_attendance)
+        patient_rows, _ = safe_run_oracle_query(
+            ONLINE_SIGNATURE_QUERY,
+            selected_attendance,
+            "Dados do paciente",
+        )
+        patient_data = patient_rows[0] if patient_rows else None
+
     if request.method == "POST":
+        selected_attendance = request.args.get("atendimento", "").strip()
+    selected_upload = None
+    patient_data = None
+
+    if selected_attendance:
+        selected_upload = find_latest_upload_for_attendance(selected_attendance)
+        patient_rows, _ = safe_run_oracle_query(
+            ONLINE_SIGNATURE_QUERY,
+            selected_attendance,
+            "Dados do paciente",
+        )
+        patient_data = patient_rows[0] if patient_rows else None
+
         if "pdf_file" not in request.files:
             flash("Selecione um arquivo PDF.", "danger")
             return redirect(url_for("upload_pdf"))
@@ -1012,7 +1159,7 @@ def upload_pdf():
                 """,
                 (
                     safe_name,
-                    str(final_path.relative_to(BASE_DIR)),
+                    to_stored_path(final_path, attendance_number),
                     attendance_number,
                     current_user()["id"],
                 ),
@@ -1027,7 +1174,13 @@ def upload_pdf():
             if temp_path.exists():
                 temp_path.unlink()
             flash(str(exc), "danger")
-    return render_template("upload.html")
+    return render_template(
+        "upload.html",
+        selected_attendance=selected_attendance,
+        selected_upload=selected_upload,
+        patient_data=patient_data,
+        signature_box=SIGNATURE_BOX_DEFAULT,
+    )
 
 
 @app.route("/attendance/<attendance_number>")

@@ -179,6 +179,36 @@ code {
   gap: 14px;
 }
 
+.signature-find-form {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.signature-layout {
+  margin-top: 18px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.pdf-preview {
+  width: 100%;
+  min-height: 520px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+#signature-pad {
+  width: 100%;
+  height: 240px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  touch-action: none;
+}
+
+
 label {
   display: grid;
   gap: 8px;
