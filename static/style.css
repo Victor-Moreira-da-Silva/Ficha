@@ -148,6 +148,31 @@ section + section {
   margin-bottom: 18px;
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.settings-tab {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 14px;
+  font-weight: 600;
+  background: var(--surface-soft);
+}
+
+.settings-tab.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
 .column {
   flex-direction: column;
 }

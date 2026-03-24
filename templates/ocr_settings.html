@@ -5,44 +5,85 @@
   <div class="section-header column">
     <div>
       <span class="eyebrow">Administração</span>
-      <h2>Configurar área de captura do OCR</h2>
+      <h2>Configurações de posição no PDF</h2>
     </div>
-    <p class="muted">Faça upload de uma imagem de referência da primeira página do PDF, clique e arraste sobre a área desejada e salve. Os percentuais são aplicados na leitura do PDF real.</p>
+    <p class="muted">Use as abas para ajustar a área de captura do OCR e também o local exato onde a assinatura deve ser inserida no PDF final.</p>
   </div>
 
-  <div class="ocr-layout">
-    <div class="ocr-preview-panel">
-      <label>
-        Imagem de referência
-        <input type="file" id="ocr-reference" accept="image/*">
-      </label>
-      <div id="ocr-canvas-wrapper" class="ocr-canvas-wrapper">
-        <img id="ocr-preview-image" alt="Pré-visualização da área OCR">
-        <div id="ocr-selection" class="ocr-selection"></div>
-      </div>
-    </div>
+  <div class="settings-tabs">
+    <a href="{{ url_for('manage_ocr_settings', tab='ocr') }}" class="settings-tab {% if active_tab == 'ocr' %}is-active{% endif %}">
+      Área OCR
+    </a>
+    <a href="{{ url_for('manage_ocr_settings', tab='signature') }}" class="settings-tab {% if active_tab == 'signature' %}is-active{% endif %}">
+      Área da assinatura
+    </a>
+  </div>
 
+  {% if active_tab == 'ocr' %}
+    <div class="ocr-layout">
+      <div class="ocr-preview-panel">
+        <label>
+          Imagem de referência
+          <input type="file" id="ocr-reference" accept="image/*">
+        </label>
+        <div id="ocr-canvas-wrapper" class="ocr-canvas-wrapper">
+          <img id="ocr-preview-image" alt="Pré-visualização da área OCR">
+          <div id="ocr-selection" class="ocr-selection"></div>
+        </div>
+      </div>
+
+      <form method="post" class="form-grid">
+        <input type="hidden" name="action" value="save_ocr">
+        <label>
+          X (%)
+          <input type="number" step="0.01" min="0" max="100" name="x_percent" id="x_percent" value="{{ region['x_percent'] }}" required>
+        </label>
+        <label>
+          Y (%)
+          <input type="number" step="0.01" min="0" max="100" name="y_percent" id="y_percent" value="{{ region['y_percent'] }}" required>
+        </label>
+        <label>
+          Largura (%)
+          <input type="number" step="0.01" min="0.01" max="100" name="width_percent" id="width_percent" value="{{ region['width_percent'] }}" required>
+        </label>
+        <label>
+          Altura (%)
+          <input type="number" step="0.01" min="0.01" max="100" name="height_percent" id="height_percent" value="{{ region['height_percent'] }}" required>
+        </label>
+
+        <button type="submit">Salvar área do OCR</button>
+      </form>
+    </div>
+  {% else %}
     <form method="post" class="form-grid">
+      <input type="hidden" name="action" value="save_signature">
+      <p class="muted">Ajuste os percentuais para definir exatamente onde a assinatura será aplicada no PDF assinado.</p>
+      <label>
+        Página (começa em 0)
+        <input type="number" min="0" step="1" name="page_index" value="{{ signature_region['page_index'] }}" required>
+      </label>
       <label>
         X (%)
-        <input type="number" step="0.01" min="0" max="100" name="x_percent" id="x_percent" value="{{ region['x_percent'] }}" required>
+        <input type="number" step="0.01" min="0" max="100" name="signature_x_percent" value="{{ signature_region['x_percent'] }}" required>
       </label>
       <label>
         Y (%)
-        <input type="number" step="0.01" min="0" max="100" name="y_percent" id="y_percent" value="{{ region['y_percent'] }}" required>
+        <input type="number" step="0.01" min="0" max="100" name="signature_y_percent" value="{{ signature_region['y_percent'] }}" required>
       </label>
       <label>
         Largura (%)
-        <input type="number" step="0.01" min="0.01" max="100" name="width_percent" id="width_percent" value="{{ region['width_percent'] }}" required>
+        <input type="number" step="0.01" min="0.01" max="100" name="signature_width_percent" value="{{ signature_region['width_percent'] }}" required>
       </label>
       <label>
         Altura (%)
-        <input type="number" step="0.01" min="0.01" max="100" name="height_percent" id="height_percent" value="{{ region['height_percent'] }}" required>
+        <input type="number" step="0.01" min="0.01" max="100" name="signature_height_percent" value="{{ signature_region['height_percent'] }}" required>
       </label>
 
-      <button type="submit">Salvar área do OCR</button>
+      <button type="submit">Salvar área da assinatura</button>
     </form>
-  </div>
+  {% endif %}
 </section>
-<script src="{{ url_for('static', filename='ocr_settings.js') }}"></script>
+{% if active_tab == 'ocr' %}
+  <script src="{{ url_for('static', filename='ocr_settings.js') }}"></script>
+{% endif %}
 {% endblock %}

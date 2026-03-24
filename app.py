@@ -491,6 +491,17 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS signature_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            page_index INTEGER NOT NULL DEFAULT 0,
+            x_ratio REAL NOT NULL,
+            y_ratio REAL NOT NULL,
+            width_ratio REAL NOT NULL,
+            height_ratio REAL NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+
         CREATE TABLE IF NOT EXISTS controle_pacientes (
          id INTEGER PRIMARY KEY AUTOINCREMENT,
          atendimento TEXT UNIQUE,
@@ -505,7 +516,11 @@ def init_db():
             "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
             ("admin", generate_password_hash("admin123"), "admin"),
         )
-    ocr_settings = db.execute("SELECT id FROM ocr_settings WHERE id = 1").fetchone()
+    # 🔥 OCR SETTINGS
+    ocr_settings = db.execute(
+        "SELECT id FROM ocr_settings WHERE id = 1"
+    ).fetchone()
+
     if ocr_settings is None:
         db.execute(
             """
@@ -519,6 +534,27 @@ def init_db():
                 DEFAULT_OCR_CAPTURE_REGION["height"],
             ),
         )
+
+    # 🔥 SIGNATURE SETTINGS
+    signature_settings = db.execute(
+        "SELECT id FROM signature_settings WHERE id = 1"
+    ).fetchone()
+
+    if signature_settings is None:
+        db.execute(
+            """
+            INSERT INTO signature_settings (id, page_index, x_ratio, y_ratio, width_ratio, height_ratio)
+            VALUES (1, ?, ?, ?, ?, ?)
+            """,
+            (
+                SIGNATURE_BOX_DEFAULT["page_index"],
+                SIGNATURE_BOX_DEFAULT["x_ratio"],
+                SIGNATURE_BOX_DEFAULT["y_ratio"],
+                SIGNATURE_BOX_DEFAULT["width_ratio"],
+                SIGNATURE_BOX_DEFAULT["height_ratio"],
+            ),
+        )
+
     db.commit()
     db.close()
 
@@ -642,6 +678,102 @@ def get_focused_image_bounds(width: int, height: int) -> tuple[int, int, int, in
         int(width * (region["x"] + region["width"])),
         int(height * (region["y"] + region["height"])),
     )
+
+def get_signature_box_settings() -> dict[str, float | int]:
+    default_box = SIGNATURE_BOX_DEFAULT.copy()
+    query = """
+        SELECT page_index, x_ratio, y_ratio, width_ratio, height_ratio
+        FROM signature_settings
+        WHERE id = 1
+    """
+
+    if has_app_context():
+        db = get_db()
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signature_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                page_index INTEGER NOT NULL DEFAULT 0,
+                x_ratio REAL NOT NULL,
+                y_ratio REAL NOT NULL,
+                width_ratio REAL NOT NULL,
+                height_ratio REAL NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        row = db.execute(query).fetchone()
+        if row is None:
+            db.execute(
+                """
+                INSERT INTO signature_settings (id, page_index, x_ratio, y_ratio, width_ratio, height_ratio)
+                VALUES (1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    SIGNATURE_BOX_DEFAULT["page_index"],
+                    SIGNATURE_BOX_DEFAULT["x_ratio"],
+                    SIGNATURE_BOX_DEFAULT["y_ratio"],
+                    SIGNATURE_BOX_DEFAULT["width_ratio"],
+                    SIGNATURE_BOX_DEFAULT["height_ratio"],
+                ),
+            )
+            db.commit()
+            return default_box
+        return {
+            "page_index": row["page_index"],
+            "x_ratio": row["x_ratio"],
+            "y_ratio": row["y_ratio"],
+            "width_ratio": row["width_ratio"],
+            "height_ratio": row["height_ratio"],
+        }
+
+    db_path = Path(app.config.get("DATABASE", DATABASE))
+    if not db_path.exists():
+        return default_box
+
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    try:
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signature_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                page_index INTEGER NOT NULL DEFAULT 0,
+                x_ratio REAL NOT NULL,
+                y_ratio REAL NOT NULL,
+                width_ratio REAL NOT NULL,
+                height_ratio REAL NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        row = db.execute(query).fetchone()
+        if row is None:
+            db.execute(
+                """
+                INSERT INTO signature_settings (id, page_index, x_ratio, y_ratio, width_ratio, height_ratio)
+                VALUES (1, ?, ?, ?, ?, ?)
+                """,
+                (
+                    SIGNATURE_BOX_DEFAULT["page_index"],
+                    SIGNATURE_BOX_DEFAULT["x_ratio"],
+                    SIGNATURE_BOX_DEFAULT["y_ratio"],
+                    SIGNATURE_BOX_DEFAULT["width_ratio"],
+                    SIGNATURE_BOX_DEFAULT["height_ratio"],
+                ),
+            )
+            db.commit()
+            return default_box
+        return {
+            "page_index": row["page_index"],
+            "x_ratio": row["x_ratio"],
+            "y_ratio": row["y_ratio"],
+            "width_ratio": row["width_ratio"],
+            "height_ratio": row["height_ratio"],
+        }
+    finally:
+        db.close()
+
 
 
 def extract_text_layer_from_pdf(pdf_path: Path, focused: bool = False) -> str:
@@ -800,7 +932,7 @@ def merge_signature_into_pdf(
         raise RuntimeError("Assinatura online indisponível: pypdfium2 não está instalado.")
 
     signature_image = decode_signature_data(signature_data_url)
-    signature_box = box or SIGNATURE_BOX_DEFAULT
+    signature_box = box or get_signature_box_settings()
 
     pdf = pdfium.PdfDocument(str(source_pdf_path))
     pages = []
@@ -1300,7 +1432,7 @@ def upload_pdf():
         selected_attendance=selected_attendance,
         selected_upload=selected_upload,
         patient_data=patient_data,
-        signature_box=SIGNATURE_BOX_DEFAULT,
+         signature_box=get_signature_box_settings(),
     )
 
 
@@ -1377,8 +1509,71 @@ def manage_users():
 @role_required("admin")
 def manage_ocr_settings():
     db = get_db()
+    active_tab = request.args.get("tab", "ocr")
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS signature_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            page_index INTEGER NOT NULL DEFAULT 0,
+            x_ratio REAL NOT NULL,
+            y_ratio REAL NOT NULL,
+            width_ratio REAL NOT NULL,
+            height_ratio REAL NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
 
     if request.method == "POST":
+        action = request.form.get("action", "save_ocr")
+
+        if action == "save_signature":
+            page_index = request.form.get("page_index", type=int)
+            x_percent = request.form.get("signature_x_percent", type=float)
+            y_percent = request.form.get("signature_y_percent", type=float)
+            width_percent = request.form.get("signature_width_percent", type=float)
+            height_percent = request.form.get("signature_height_percent", type=float)
+
+            values = [x_percent, y_percent, width_percent, height_percent]
+            if page_index is None or page_index < 0 or any(value is None for value in values):
+                flash("Preencha todos os campos da área da assinatura.", "danger")
+                return redirect(url_for("manage_ocr_settings", tab="signature"))
+
+            if (
+                x_percent < 0
+                or y_percent < 0
+                or width_percent <= 0
+                or height_percent <= 0
+                or x_percent + width_percent > 100
+                or y_percent + height_percent > 100
+            ):
+                flash("A área da assinatura deve ficar dentro de 0% a 100% da página.", "danger")
+                return redirect(url_for("manage_ocr_settings", tab="signature"))
+
+            db.execute(
+                """
+                INSERT INTO signature_settings (id, page_index, x_ratio, y_ratio, width_ratio, height_ratio, updated_at)
+                VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    page_index = excluded.page_index,
+                    x_ratio = excluded.x_ratio,
+                    y_ratio = excluded.y_ratio,
+                    width_ratio = excluded.width_ratio,
+                    height_ratio = excluded.height_ratio,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    page_index,
+                    x_percent / 100,
+                    y_percent / 100,
+                    width_percent / 100,
+                    height_percent / 100,
+                ),
+            )
+            db.commit()
+            flash("Área da assinatura atualizada com sucesso.", "success")
+            return redirect(url_for("manage_ocr_settings", tab="signature"))
+
         x_percent = request.form.get("x_percent", type=float)
         y_percent = request.form.get("y_percent", type=float)
         width_percent = request.form.get("width_percent", type=float)
@@ -1387,7 +1582,7 @@ def manage_ocr_settings():
         values = [x_percent, y_percent, width_percent, height_percent]
         if any(value is None for value in values):
             flash("Preencha todos os campos da área do OCR.", "danger")
-            return redirect(url_for("manage_ocr_settings"))
+            return redirect(url_for("manage_ocr_settings", tab="ocr"))
 
         if (
             x_percent < 0
@@ -1398,7 +1593,7 @@ def manage_ocr_settings():
             or y_percent + height_percent > 100
         ):
             flash("A área do OCR deve ficar dentro de 0% a 100% da página.", "danger")
-            return redirect(url_for("manage_ocr_settings"))
+            return redirect(url_for("manage_ocr_settings", tab="ocr"))
 
         db.execute(
             """
@@ -1415,16 +1610,25 @@ def manage_ocr_settings():
         )
         db.commit()
         flash("Área do OCR atualizada com sucesso.", "success")
-        return redirect(url_for("manage_ocr_settings"))
+        return redirect(url_for("manage_ocr_settings", tab="ocr"))
 
     region = get_ocr_capture_region()
+    signature_box = get_signature_box_settings()
     return render_template(
         "ocr_settings.html",
+        active_tab=active_tab if active_tab in {"ocr", "signature"} else "ocr",
         region={
             "x_percent": round(region["x"] * 100, 2),
             "y_percent": round(region["y"] * 100, 2),
             "width_percent": round(region["width"] * 100, 2),
             "height_percent": round(region["height"] * 100, 2),
+        },
+        signature_region={
+            "page_index": int(signature_box["page_index"]),
+            "x_percent": round(signature_box["x_ratio"] * 100, 2),
+            "y_percent": round(signature_box["y_ratio"] * 100, 2),
+            "width_percent": round(signature_box["width_ratio"] * 100, 2),
+            "height_percent": round(signature_box["height_ratio"] * 100, 2),
         },
     )
 

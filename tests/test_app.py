@@ -193,7 +193,29 @@ class FichaAppTestCase(unittest.TestCase):
     def test_admin_can_access_ocr_settings_page(self):
         self.login("admin", "admin123")
         response = self.client.get("/admin/ocr-settings", follow_redirects=True)
-        self.assertIn("Configurar área de captura do OCR".encode(), response.data)
+        self.assertIn("Configurações de posição no PDF".encode(), response.data)
+        self.assertIn("Área da assinatura".encode(), response.data)
+
+    def test_admin_can_update_signature_settings(self):
+        self.login("admin", "admin123")
+        response = self.client.post(
+            "/admin/ocr-settings?tab=signature",
+            data={
+                "action": "save_signature",
+                "page_index": 0,
+                "signature_x_percent": 10,
+                "signature_y_percent": 60,
+                "signature_width_percent": 30,
+                "signature_height_percent": 8,
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("Área da assinatura atualizada com sucesso".encode(), response.data)
+
+        with ficha_app.app.app_context():
+            settings = ficha_app.get_signature_box_settings()
+        self.assertAlmostEqual(settings["x_ratio"], 0.10)
+        self.assertAlmostEqual(settings["y_ratio"], 0.60)
 
     def test_admin_can_access_upload_page(self):
         self.login("admin", "admin123")
