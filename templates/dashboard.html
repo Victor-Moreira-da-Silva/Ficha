@@ -3,7 +3,6 @@
 
 {% block content %}
 
-<!-- 📊 CARDS -->
 <section class="hero-grid">
   <article class="card stat-card">
     <span class="eyebrow">Usuários</span>
@@ -24,8 +23,6 @@
   </article>
 </section>
 
-
-<!-- 📂 UPLOADS -->
 <section class="card">
   <div class="section-header">
     <div>
@@ -57,18 +54,20 @@
           <td>{{ item['uploader'] }}</td>
           <td>{{ item['created_at'] }}</td>
           <td>
-            {% if current_user['role'] in ['faturamento', 'admin'] %}
-              <a href="{{ url_for('serve_file', relative_path=item['stored_path']) }}">Baixar</a>
-              <a href="{{ url_for('attendance_details', attendance_number=item['attendance_number']) }}">Detalhes</a>
-            {% else %}
-              <span class="muted">Sem acesso</span>
-            {% endif %}
+            <div class="action-group">
+              {% if current_user['role'] in ['faturamento', 'admin'] %}
+                <a class="link-action" href="{{ url_for('serve_file', relative_path=item['stored_path']) }}">Baixar</a>
+                <a class="link-action" href="{{ url_for('attendance_details', attendance_number=item['attendance_number']) }}">Detalhes</a>
+              {% else %}
+                <span class="muted">Sem acesso</span>
+              {% endif %}
 
-            {% if current_user['role'] == 'admin' %}
-              <form method="post" action="{{ url_for('delete_upload', upload_id=item['id']) }}" class="inline-form">
-                <button type="submit" class="danger-button">Excluir</button>
-              </form>
-            {% endif %}
+              {% if current_user['role'] == 'admin' %}
+                <form method="post" action="{{ url_for('delete_upload', upload_id=item['id']) }}" class="inline-form">
+                  <button type="submit" class="danger-button">Excluir</button>
+                </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% else %}
@@ -81,13 +80,11 @@
   </div>
 </section>
 
-
-<!-- 🏥 PACIENTES -->
 <section class="card">
   <div class="section-header">
     <div>
       <h2>Pacientes / Atendimentos</h2>
-      <p class="muted">🟢 Verde = já possui PDF anexado</p>
+      <p class="muted">🟢 Possui PDF anexado · ⚪ Sem PDF</p>
     </div>
   </div>
 
@@ -104,20 +101,17 @@
 
       <tbody>
         {% for p in patients %}
-        <tr class="{% if p.tem_pdf %}linha-verde{% endif %}"></tr>
-          
-          <td style="font-size:18px;">
+        <tr class="{% if p.tem_pdf %}linha-verde{% endif %}">
+          <td>
             {% if p.tem_pdf %}
-              ✅
+              <span class="status-chip status-success">✅ Com PDF</span>
             {% else %}
-              ❌
+              <span class="status-chip">❌ Sem PDF</span>
             {% endif %}
           </td>
-
           <td>{{ p.cd_atendimento }}</td>
           <td>{{ p.nm_paciente }}</td>
           <td>{{ p.data }}</td>
-
         </tr>
         {% else %}
         <tr>
@@ -125,7 +119,6 @@
         </tr>
         {% endfor %}
       </tbody>
-
     </table>
   </div>
 </section>
