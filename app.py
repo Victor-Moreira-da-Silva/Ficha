@@ -359,7 +359,25 @@ def format_patient_datetime(value) -> str:
 def get_patient_value(patient_data, key: str, fallback: str = "-") -> str:
     if not patient_data:
         return fallback
-    value = patient_data.get(key) if hasattr(patient_data, "get") else patient_data[key]
+    value = None
+    if hasattr(patient_data, "get"):
+        value = patient_data.get(key)
+        if value is None:
+            value = patient_data.get(key.upper())
+        if value is None:
+            value = patient_data.get(key.lower())
+    else:
+        try:
+            value = patient_data[key]
+        except Exception:
+            try:
+                value = patient_data[key.upper()]
+            except Exception:
+                try:
+                    value = patient_data[key.lower()]
+                except Exception:
+                    value = None
+
     if value in (None, ""):
         return fallback
     return str(value)
@@ -1340,17 +1358,27 @@ def upload_pdf():
                 return redirect(url_for("upload_pdf"))
 
             source_upload = find_latest_upload_for_attendance(attendance_number)
-            if not source_upload:
-                flash("Nenhum PDF base foi encontrado para o atendimento informado.", "danger")
-                return redirect(url_for("upload_pdf", atendimento=attendance_number))
+            source_pdf_path = None
+            if source_upload:
+                source_pdf_path = BASE_DIR / source_upload["stored_path"]
+            else:
+                generated_base_path = (
+                    Path(app.config["UPLOAD_ROOT"])
+                    / attendance_number
+                    / f"{attendance_number}-signature-base.pdf"
+                )
+                if generated_base_path.exists():
+                    source_pdf_path = generated_base_path
+                else:
+                    flash("Nenhum PDF base foi encontrado para o atendimento informado.", "danger")
+                    return redirect(url_for("upload_pdf", atendimento=attendance_number))
 
-            source_pdf_path = BASE_DIR / source_upload["stored_path"]
             if not source_pdf_path.exists():
                 configured_root = Path(app.config["UPLOAD_ROOT"])
                 source_fallback = (
                     configured_root
-                    / source_upload["attendance_number"]
-                    / Path(source_upload["stored_path"]).name
+                    / attendance_number
+                    / Path(source_pdf_path).name
                 )
                 if source_fallback.exists():
                     source_pdf_path = source_fallback

@@ -28,13 +28,15 @@
     <p class="muted">Digite o número do atendimento para gerar uma ficha de assinatura. O paciente pode assinar com o dedo/caneta, e o sistema salva um novo PDF assinado.</p>
   </div>
 
-  <form method="get" action="{{ url_for('upload_pdf') }}" class="form-grid signature-find-form">
+  <form method="get" action="{{ url_for('upload_pdf') }}" class="form-grid signature-find-form" id="signature-find-form">
     <label>
       Número do atendimento
-      <input type="text" name="atendimento" value="{{ selected_attendance or '' }}" placeholder="Ex.: 00180627" required>
+      <input type="text" name="atendimento" value="{{ selected_attendance or '' }}" placeholder="Ex.: 00180627" required id="attendance-input">
     </label>
-    <button type="submit">OK</button>
+    <button type="submit">Carregar ficha</button>
   </form>
+  <p class="muted">Dica: a ficha é carregada automaticamente ao terminar de digitar o atendimento.</p>
+  <p class="muted">Precisa ajustar posição da assinatura? <a href="{{ url_for('manage_ocr_settings', tab='signature') }}">Abrir aba Área da assinatura</a>.</p>
 
   {% if selected_attendance %}
     {% if selected_upload %}
@@ -60,75 +62,7 @@
             <input type="hidden" name="signature_data" id="signature_data">
             <canvas id="signature-pad" width="700" height="240"></canvas>
             <div class="action-group">
-              <button type="button" id="signature-clear" class="warning-button">Limpar assinatura</button>
-              <button type="submit" class="success-button">Salvar assinatura</button>
-            </div>
-            <p class="muted">A assinatura será posicionada no campo configurado da ficha e salva automaticamente como novo PDF.</p>
-          </form>
-        </div>
-      </div>
-    {% else %}
-      <p class="empty-state">Não foi possível gerar a ficha de assinatura para este atendimento.</p>
-    {% endif %}
-  {% endif %}
-</section>
-
-{% if selected_attendance and selected_upload %}
-<script>
-  (function () {
-    const canvas = document.getElementById("signature-pad");
-    const form = document.getElementById("signature-form");
-    const hiddenInput = document.getElementById("signature_data");
-    const clearButton = document.getElementById("signature-clear");
-    if (!canvas || !form || !hiddenInput || !clearButton) return;
-
-    const ctx = canvas.getContext("2d");
-    let isDrawing = false;
-    let hasDrawn = false;
-
-    function resizeCanvas() {
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      const displayWidth = canvas.clientWidth;
-      const displayHeight = canvas.clientHeight;
-      canvas.width = Math.floor(displayWidth * ratio);
-      canvas.height = Math.floor(displayHeight * ratio);
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "#000";
-    }
-
-    function getPoint(event) {
-      const rect = canvas.getBoundingClientRect();
-      const touch = event.touches ? event.touches[0] : event;
-      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
-    }
-
-    function start(event) {
-      isDrawing = true;
-      const { x, y } = getPoint(event);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      event.preventDefault();
-    }
-
-    function move(event) {
-      if (!isDrawing) return;
-      const { x, y } = getPoint(event);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      hasDrawn = true;
-      event.preventDefault();
-    }
-
-    function end(event) {
-      if (!isDrawing) return;
-      isDrawing = false;
-      event.preventDefault();
-    }
-
-    function clear() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+@@ -132,26 +134,49 @@
       hasDrawn = false;
       hiddenInput.value = "";
     }
@@ -154,4 +88,27 @@
   })();
 </script>
 {% endif %}
+
+<script>
+  (function () {
+    const form = document.getElementById("signature-find-form");
+    const input = document.getElementById("attendance-input");
+    if (!form || !input) return;
+
+    let timer = null;
+    const initialValue = "{{ selected_attendance or '' }}".trim();
+
+    input.addEventListener("input", function () {
+      const value = input.value.trim();
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+      if (value.length < 4 || value === initialValue) return;
+
+      timer = window.setTimeout(function () {
+        form.submit();
+      }, 700);
+    });
+  })();
+</script>
 {% endblock %}
