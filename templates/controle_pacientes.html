@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block title %}Controle de Pacientes{% endblock %}
+
+{% block content %}
+
+<section class="card">
+  <h2>Controle de Pacientes</h2>
+  <p class="muted">Pacientes recentes para conferência e faturamento</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Atendimento</th>
+          <th>Data</th>
+          <th>Status</th>
+          <th>Ação</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for p in pacientes %}
+        <tr {% if p.vigilancia %}style="background-color:#fff3cd;"{% endif %}>
+  <td>{{ p.cd_atendimento }}</td>
+  <td>{{ p.nm_paciente }}</td>
+  <td>{{ p.data }}</td>
+
+  <td>
+    <a href="{{ url_for('attendance_details', attendance_number=p['cd_atendimento']) }}" 
+       class="btn btn-info" target="_blank">
+      Ver ficha
+    </a>
+  </td>
+
+  <td>
+    <!-- seus botões de vigilância / lançado -->
+  </td>
+</tr>
+
+          <!-- STATUS -->
+          <td>
+            {% if p.vigilancia %}
+              <span style="color: orange; font-weight: bold;">🟠 Vigilância</span><br>
+            {% endif %}
+
+            {% if not p.vigilancia %}
+              <span class="muted">Pendente</span>
+            {% endif %}
+          </td>
+
+          <!-- AÇÕES -->
+          <td>
+
+            <!-- VIGILANCIA -->
+            {% if p.vigilancia %}
+              <form method="post" style="display:inline;">
+                <input type="hidden" name="atendimento" value="{{ p.cd_atendimento }}">
+                <input type="hidden" name="acao" value="vigilancia_off">
+                <button style="background: gray; color:white; border:none; padding:5px 8px;">
+                  Remover Vigilância
+                </button>
+              </form>
+            {% else %}
+              <form method="post" style="display:inline;"
+                    onsubmit="return confirm('Deseja colocar em vigilância?')">
+                <input type="hidden" name="atendimento" value="{{ p.cd_atendimento }}">
+                <input type="hidden" name="acao" value="vigilancia_on">
+                <button style="background: orange; color:white; border:none; padding:5px 8px;">
+                  Vigilância
+                </button>
+              </form>
+            {% endif %}
+
+            <!-- LANÇADO -->
+            <form method="post" style="display:inline;"
+                  onsubmit="return confirm('Confirmar lançamento deste paciente?')">
+              <input type="hidden" name="atendimento" value="{{ p.cd_atendimento }}">
+              <input type="hidden" name="acao" value="lancado">
+              <button style="background: green; color:white; border:none; padding:5px 8px;">
+                Lançado
+              </button>
+            </form>
+
+          </td>
+        </tr>
+
+        {% else %}
+        <tr>
+          <td colspan="5" class="empty-state">
+            Nenhum paciente encontrado
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+
+    </table>
+  </div>
+</section>
+
+{% endblock %}

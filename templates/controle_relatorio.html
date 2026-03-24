@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block title %}Relatório de Controle{% endblock %}
+
+{% block content %}
+
+<section class="card">
+  <h2>Relatório de Controle de Pacientes</h2>
+  <p class="muted">Visualização organizada por mês</p>
+
+  {% for mes, dados in agrupado.items() %}
+  
+  <div class="card" id="mes-{{ mes|replace('/', '-') }}" style="margin-top:25px;">
+
+    <div class="section-header">
+      <h3>📁 {{ mes }}</h3>
+
+      <button onclick="imprimirMes('{{ mes|replace('/', '-') }}')" class="button-link">
+        🖨️ Imprimir
+      </button>
+    </div>
+
+    <!-- 🟢 LANÇADOS -->
+    <h4 style="margin-top:15px;">🟢 Lançados ({{ dados.lancados|length }})</h4>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th>Atendimento</th>
+            <th>Data</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for p in dados.lancados %}
+          <tr>
+            <td>{{ p.nm_paciente }}</td>
+            <td>{{ p.cd_atendimento }}</td>
+            <td>{{ p.data }}</td>
+            <td>
+              <a href="{{ url_for('attendance_details', attendance_number=p['cd_atendimento']) }}" 
+                 class="button-link" target="_blank">
+                👁️ Ver ficha
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="empty-state">Nenhum lançado</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 🟠 VIGILANCIA -->
+    <h4 style="margin-top:25px;">🟠 Vigilância ({{ dados.vigilancia|length }})</h4>
+
+    <div class="table-wrap">
+      <table class="tabela-vigilancia">
+        <thead>
+          <tr>
+            <th>Paciente</th>
+            <th>Atendimento</th>
+            <th>Data</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for p in dados.vigilancia %}
+          <tr style="background-color:#fff3cd;">
+            <td>{{ p.nm_paciente }}</td>
+            <td>{{ p.cd_atendimento }}</td>
+            <td>{{ p.data }}</td>
+            <td>
+              <a href="{{ url_for('attendance_details', attendance_number=p['cd_atendimento']) }}" 
+                 class="button-link" target="_blank">
+                👁️ Ver ficha
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="empty-state">Nenhum em vigilância</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  {% else %}
+  <p class="empty-state">Nenhum dado encontrado.</p>
+  {% endfor %}
+
+</section>
+
+<!-- 🖨️ SCRIPT DE IMPRESSÃO -->
+<script>
+function imprimirMes(mesId) {
+    const conteudo = document.getElementById("mes-" + mesId).innerHTML;
+
+    const janela = window.open('', '', 'width=900,height=700');
+
+    janela.document.write(`
+        <html>
+        <head>
+            <title>Relatório</title>
+            <style>
+                body { font-family: Arial; padding:20px; }
+                table { width:100%; border-collapse: collapse; margin-top:10px; }
+                th, td { border:1px solid #ccc; padding:6px; text-align:left; }
+                th { background:#eee; }
+                h3 { margin-top:20px; }
+            </style>
+        </head>
+        <body>
+            ${conteudo}
+        </body>
+        </html>
+    `);
+
+    janela.document.close();
+    janela.print();
+}
+</script>
+
+{% endblock %}

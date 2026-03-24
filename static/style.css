@@ -1,3 +1,5 @@
+altere oque esta interferindo apenas nessa pagina 
+
 :root {
   --bg: #f3f5fb;
   --card: #ffffff;
@@ -295,4 +297,90 @@ code {
   .ocr-layout {
     grid-template-columns: 1fr;
   }
+
+.linha-verde {
+  background-color: #d4edda;
+  font-weight: 500;
+}
+
+.linha-verde td:first-child {
+  color: green;
+}
+
+.linha-laranja {
+  background-color: #ffe5b4;
+}
+
+.success-button {
+  background-color: #28a745;
+  color: white;
+}
+.tabela-laranja {
+  background-color: #fff3cd;
+}
+
+.tabela-laranja tr {
+  background-color: #ffe5b4;
+}
+.tabela-vigilancia {
+  background-color: #fff3cd;
+}
+
+.tabela-vigilancia tr {
+  background-color: #ffe5b4;
+}
+/* TOPBAR */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111827;
+  color: white;
+  padding: 10px 20px;
+  flex-wrap: wrap; /* importante pra não quebrar feio */
+}
+
+/* LOGO */
+.top-left h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+/* MENU CENTRAL */
+.top-menu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap; /* evita quebrar estranho */
+}
+
+/* LINKS */
+.top-menu a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #d1d5db;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap; /* 🔥 evita quebrar texto */
+}
+
+.top-menu a:hover {
+  background: #1f2937;
+  color: white;
+}
+
+/* DIREITA */
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* REMOVE HERANÇA DA SIDEBAR */
+.sidebar {
+  display: none; /* garante que não interfira */
+}
 }

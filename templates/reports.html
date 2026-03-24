@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% block title %}Relatórios{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h2>Relatórios de Atendimento</h2>
+
+  <!-- 🔍 FILTROS -->
+  <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
+    <input type="date" id="dataInicio">
+    <input type="date" id="dataFim">
+
+    <button onclick="aplicarFiltro()">🔍 Filtrar</button>
+
+    <button onclick="imprimirResumo()">🖨️ Imprimir Resumo</button>
+    <button onclick="imprimirDetalhado()">📄 Imprimir Detalhado</button>
+  </div>
+
+  <!-- 📊 GRÁFICOS -->
+  <div style="margin-top:30px;">
+    <h3>📅 Por Dia</h3>
+    <div style="height:300px;">
+      <canvas id="dailyChart"></canvas>
+    </div>
+  </div>
+
+  <div style="margin-top:40px;">
+    <h3>📆 Por Mês</h3>
+    <div style="height:300px;">
+      <canvas id="monthlyChart"></canvas>
+    </div>
+  </div>
+
+  <div style="margin-top:40px;">
+    <h3>📊 Por Ano</h3>
+    <div style="height:300px;">
+      <canvas id="yearlyChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// 🔥 Dados vindos do Flask (SEM erro no VS Code)
+const daily = JSON.parse('{{ daily | tojson | safe }}');
+const monthly = JSON.parse('{{ monthly | tojson | safe }}');
+const yearly = JSON.parse('{{ yearly | tojson | safe }}');
+const detalhado = JSON.parse('{{ detalhado | tojson | safe }}');
+
+// 🔥 Processamento
+const dailyLabels = daily.map(d => d.data);
+const dailyData   = daily.map(d => d.total);
+
+const monthlyLabels = monthly.map(d => d.mes);
+const monthlyData   = monthly.map(d => d.total);
+
+const yearlyLabels = yearly.map(d => d.ano);
+const yearlyData   = yearly.map(d => d.total);
+
+// 🔥 Criar gráfico
+function createChart(canvasId, labels, data, label) {
+    const ctx = document.getElementById(canvasId);
+
+    if (!labels.length) {
+        ctx.parentElement.innerHTML += "<p>Sem dados</p>";
+        return;
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: data,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+// 🔥 Renderizar gráficos
+createChart('dailyChart', dailyLabels, dailyData, 'Por dia');
+createChart('monthlyChart', monthlyLabels, monthlyData, 'Por mês');
+createChart('yearlyChart', yearlyLabels, yearlyData, 'Por ano');
+
+
+// =======================
+// 🔍 FILTRO
+// =======================
+function aplicarFiltro() {
+    const inicio = document.getElementById('dataInicio').value;
+    const fim = document.getElementById('dataFim').value;
+
+    if (!inicio || !fim) {
+        alert("Selecione as datas!");
+        return;
+    }
+
+    window.location.href = `/reports?inicio=${inicio}&fim=${fim}`;
+}
+
+
+// =======================
+// 🖨️ IMPRESSÃO RESUMO
+// =======================
+function imprimirResumo() {
+    const total = dailyData.reduce((a, b) => a + b, 0);
+
+    const conteudo = `
+        <h2>Resumo de Atendimentos</h2>
+        <p><strong>Total:</strong> ${total}</p>
+        <hr>
+        <h3>Por Dia</h3>
+        ${dailyLabels.map((d, i) => `<p>${d}: ${dailyData[i]}</p>`).join('')}
+    `;
+
+    imprimir(conteudo);
+}
+
+
+// =======================
+// 📄 IMPRESSÃO DETALHADA
+// =======================
+function imprimirDetalhado() {
+    const linhas = detalhado.map(d => `
+        <tr style="background-color: ${d.tem_pdf ? '#d4edda' : 'white'};">
+            <td>${d.tem_pdf ? '✅' : '❌'}</td>
+            <td>${d.nm_paciente}</td>
+            <td>${d.numero_atendimento}</td>
+            <td>${d.data_atendimento}</td>
+        </tr>
+    `).join('');
+
+    const conteudo = `
+        <h2>Lista de Pacientes</h2>
+        <p>🟢 Verde = possui PDF anexado</p>
+
+        <table border="1" cellspacing="0" cellpadding="5">
+            <tr>
+                <th>Status</th>
+                <th>Paciente</th>
+                <th>Atendimento</th>
+                <th>Data</th>
+            </tr>
+            ${linhas}
+        </table>
+    `;
+
+    imprimir(conteudo);
+}
+
+
+// =======================
+// 🧾 FUNÇÃO GLOBAL DE IMPRESSÃO
+// =======================
+function imprimir(conteudo) {
+    const tela = window.open('', '', 'width=900,height=700');
+
+    tela.document.write(`
+        <html>
+        <head>
+            <title>Impressão</title>
+        </head>
+        <body>
+            ${conteudo}
+        </body>
+        </html>
+    `);
+
+    tela.document.close();
+    tela.print();
+}
+</script>
+
+{% endblock %}

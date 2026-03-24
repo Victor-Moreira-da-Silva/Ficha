@@ -26,6 +26,7 @@
         <h3>Classificação</h3>
         <p><strong>Risco:</strong> {{ summary['classificacao_risco'] }}</p>
         <p><strong>Queixa principal:</strong> {{ summary['queixa_principal'] }}</p>
+        <p><strong>CID:</strong> {{ summary['cid_label'] or '-' }}</p>
       </article>
       <article class="card detail-card">
         <h3>Sinais vitais</h3>
@@ -57,6 +58,8 @@
           <th>Qtde</th>
           <th>Classificação</th>
           <th>Forma Aplicação</th>
+          <th>Médico solicitante</th>
+          <th>CID</th>
         </tr>
       </thead>
       <tbody>
@@ -68,10 +71,86 @@
           <td>{{ item['qt_solicitado'] }}</td>
           <td>{{ item['cd_cor_referencia'] }}</td>
           <td>{{ item['cd_for_apl'] }}</td>
+          <td>{{ item['medico_solicitante'] or '-' }}</td>
+          <td>{{ item['cid_label'] or '-' }}</td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="empty-state">Nenhum dado de prescrição encontrado.</td>
+          <td colspan="8" class="empty-state">Nenhum dado de prescrição encontrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Exames laboratoriais solicitados</h2>
+      <p class="muted">Pedidos laboratoriais vinculados ao atendimento.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Data/Hora</th>
+          <th>Exame</th>
+          <th>Médico solicitante</th>
+          <th>CID</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in lab_exams %}
+        <tr>
+          <td>{{ item['nm_paciente'] }}</td>
+          <td>{{ item['data_hora'] }}</td>
+          <td>{{ item['exame'] }}</td>
+          <td>{{ item['medico_solicitante'] or '-' }}</td>
+          <td>{{ item['cid_label'] or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="empty-state">Nenhum exame laboratorial encontrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Exames de imagem solicitados</h2>
+      <p class="muted">Pedidos de imagem vinculados ao atendimento.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Data/Hora</th>
+          <th>Exame</th>
+          <th>Médico solicitante</th>
+          <th>CID</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in imaging_exams %}
+        <tr>
+          <td>{{ item['nm_paciente'] }}</td>
+          <td>{{ item['data_hora'] }}</td>
+          <td>{{ item['exame'] }}</td>
+          <td>{{ item['medico_solicitante'] or '-' }}</td>
+          <td>{{ item['cid_label'] or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="empty-state">Nenhum exame de imagem encontrado.</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -95,6 +174,8 @@
           <th>Queixa</th>
           <th>Risco</th>
           <th>Medicamento</th>
+          <th>Médico solicitante</th>
+          <th>CID</th>
         </tr>
       </thead>
       <tbody>
@@ -105,10 +186,12 @@
           <td>{{ item['queixa_principal'] }}</td>
           <td>{{ item['classificacao_risco'] }}</td>
           <td>{{ item['medicamento'] }}</td>
+          <td>{{ item['medico_solicitante'] or '-' }}</td>
+          <td>{{ item['cid_label'] or '-' }}</td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="5" class="empty-state">Nenhum dado clínico encontrado.</td>
+          <td colspan="7" class="empty-state">Nenhum dado clínico encontrado.</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -1,17 +1,22 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard | Ficha OCR{% endblock %}
+
 {% block content %}
+
+<!-- 📊 CARDS -->
 <section class="hero-grid">
   <article class="card stat-card">
     <span class="eyebrow">Usuários</span>
     <strong>{{ user_count }}</strong>
     <p class="muted">Perfis cadastrados no sistema.</p>
   </article>
+
   <article class="card stat-card">
     <span class="eyebrow">PDFs processados</span>
     <strong>{{ upload_count }}</strong>
     <p class="muted">Arquivos organizados por número de atendimento.</p>
   </article>
+
   <article class="card stat-card">
     <span class="eyebrow">Seu perfil</span>
     <strong>{{ user['role']|capitalize }}</strong>
@@ -19,12 +24,15 @@
   </article>
 </section>
 
+
+<!-- 📂 UPLOADS -->
 <section class="card">
   <div class="section-header">
     <div>
       <h2>Últimos uploads</h2>
       <p class="muted">Histórico recente de PDFs processados pelo OCR.</p>
     </div>
+
     {% if current_user['role'] in ['recepcao', 'admin'] %}
       <a class="button-link" href="{{ url_for('upload_pdf') }}">Novo upload</a>
     {% endif %}
@@ -55,6 +63,7 @@
             {% else %}
               <span class="muted">Sem acesso</span>
             {% endif %}
+
             {% if current_user['role'] == 'admin' %}
               <form method="post" action="{{ url_for('delete_upload', upload_id=item['id']) }}" class="inline-form">
                 <button type="submit" class="danger-button">Excluir</button>
@@ -71,4 +80,54 @@
     </table>
   </div>
 </section>
+
+
+<!-- 🏥 PACIENTES -->
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Pacientes / Atendimentos</h2>
+      <p class="muted">🟢 Verde = já possui PDF anexado</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Atendimento</th>
+          <th>Paciente</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for p in patients %}
+        <tr class="{% if p.tem_pdf %}linha-verde{% endif %}"></tr>
+          
+          <td style="font-size:18px;">
+            {% if p.tem_pdf %}
+              ✅
+            {% else %}
+              ❌
+            {% endif %}
+          </td>
+
+          <td>{{ p.cd_atendimento }}</td>
+          <td>{{ p.nm_paciente }}</td>
+          <td>{{ p.data }}</td>
+
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="empty-state">Nenhum paciente encontrado.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+
+    </table>
+  </div>
+</section>
+
 {% endblock %}

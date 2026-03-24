@@ -79,6 +79,9 @@ SELECT
     TA.CD_COR_REFERENCIA,
     PA.NM_PACIENTE,
     TRUNC(MONTHS_BETWEEN(SYSDATE, PA.DT_NASCIMENTO)/12) AS IDADE,
+    PREST.NM_PRESTADOR AS MEDICO_SOLICITANTE,
+    A.CD_CID,
+    CID.DS_CID,
     (
         SELECT MAX(TRIM(PM2.CD_FOR_APL))
         FROM DBAMV.ITPRE_MED PM2
@@ -99,9 +102,99 @@ LEFT JOIN DBAMV.PACIENTE PA
     ON PA.CD_PACIENTE = A.CD_PACIENTE
 LEFT JOIN DBAMV.TRIAGEM_ATENDIMENTO TA
     ON TA.CD_ATENDIMENTO = A.CD_ATENDIMENTO
+LEFT JOIN DBAMV.PRESTADOR PREST
+    ON PREST.CD_PRESTADOR = PMED.CD_PRESTADOR
+LEFT JOIN DBAMV.CID CID
+    ON CID.CD_CID = A.CD_CID
 WHERE
-    TO_CHAR(SP.CD_ATENDIMENTO) LIKE '%' || :attendance_number_str || '%'
+    SP.CD_ATENDIMENTO = :attendance_number_num
 ORDER BY PMED.DT_PRE_MED DESC
+"""
+
+REPORT_DAILY_QUERY = """
+SELECT
+    TRUNC(A.DT_ATENDIMENTO) AS DATA,
+    COUNT(*) AS TOTAL
+FROM DBAMV.ATENDIME A
+WHERE A.TP_ATENDIMENTO = 'U'
+GROUP BY TRUNC(A.DT_ATENDIMENTO)
+ORDER BY DATA
+"""
+
+REPORT_MONTHLY_QUERY = """
+SELECT
+    TO_CHAR(A.DT_ATENDIMENTO, 'YYYY-MM') AS MES,
+    COUNT(*) AS TOTAL
+FROM DBAMV.ATENDIME A
+WHERE 
+    A.TP_ATENDIMENTO = 'U'
+    AND A.DT_ATENDIMENTO >= ADD_MONTHS(TRUNC(SYSDATE, 'MM'), -11)
+GROUP BY TO_CHAR(A.DT_ATENDIMENTO, 'YYYY-MM')
+ORDER BY MES
+"""
+
+REPORT_YEARLY_QUERY = """
+SELECT
+    TO_CHAR(A.DT_ATENDIMENTO, 'YYYY') AS ANO,
+    COUNT(*) AS TOTAL
+FROM DBAMV.ATENDIME A
+WHERE A.TP_ATENDIMENTO = 'U'
+GROUP BY TO_CHAR(A.DT_ATENDIMENTO, 'YYYY')
+ORDER BY ANO
+"""
+
+LAB_EXAMS_QUERY = """
+SELECT
+    PL.CD_ATENDIMENTO,
+    TO_CHAR(PL.DT_PEDIDO,'DD/MM/YYYY HH24:MI') AS DATA_HORA,
+    EXL.NM_EXA_LAB AS EXAME,
+    PA.NM_PACIENTE,
+    PREST.NM_PRESTADOR AS MEDICO_SOLICITANTE,
+    A.CD_CID,
+    CID.DS_CID
+FROM DBAMV.PED_LAB PL
+LEFT JOIN DBAMV.ITPED_LAB IPL
+    ON IPL.CD_PED_LAB = PL.CD_PED_LAB
+LEFT JOIN DBAMV.EXA_LAB EXL
+    ON EXL.CD_EXA_LAB = IPL.CD_EXA_LAB
+LEFT JOIN DBAMV.ATENDIME A
+    ON A.CD_ATENDIMENTO = PL.CD_ATENDIMENTO
+LEFT JOIN DBAMV.PACIENTE PA
+    ON PA.CD_PACIENTE = A.CD_PACIENTE
+LEFT JOIN DBAMV.PRESTADOR PREST
+    ON PREST.CD_PRESTADOR = PL.CD_PRESTADOR
+LEFT JOIN DBAMV.CID CID
+    ON CID.CD_CID = A.CD_CID
+WHERE
+    PL.CD_ATENDIMENTO = :attendance_number_num
+ORDER BY PL.DT_PEDIDO DESC
+"""
+
+IMAGING_EXAMS_QUERY = """
+SELECT
+    PRX.CD_ATENDIMENTO,
+    TO_CHAR(PRX.DT_PEDIDO,'DD/MM/YYYY') || ' ' || TO_CHAR(PRX.HR_PEDIDO,'HH24:MI') AS DATA_HORA,
+    EXR.DS_EXA_RX AS EXAME,
+    PA.NM_PACIENTE,
+    PREST.NM_PRESTADOR AS MEDICO_SOLICITANTE,
+    A.CD_CID,
+    CID.DS_CID
+FROM DBAMV.PED_RX PRX
+LEFT JOIN DBAMV.ITPED_RX IPRX
+    ON IPRX.CD_PED_RX = PRX.CD_PED_RX
+LEFT JOIN DBAMV.EXA_RX EXR
+    ON EXR.CD_EXA_RX = IPRX.CD_EXA_RX
+LEFT JOIN DBAMV.ATENDIME A
+    ON A.CD_ATENDIMENTO = PRX.CD_ATENDIMENTO
+LEFT JOIN DBAMV.PACIENTE PA
+    ON PA.CD_PACIENTE = A.CD_PACIENTE
+LEFT JOIN DBAMV.PRESTADOR PREST
+    ON PREST.CD_PRESTADOR = PRX.CD_PRESTADOR
+LEFT JOIN DBAMV.CID CID
+    ON CID.CD_CID = A.CD_CID
+WHERE
+    TO_CHAR(PRX.CD_ATENDIMENTO) LIKE '%' || :attendance_number_str || '%'
+ORDER BY PRX.DT_PEDIDO DESC, PRX.HR_PEDIDO DESC
 """
 
 ATTENDANCE_CONTEXT_QUERY = """
@@ -182,12 +275,21 @@ SELECT
     MAX(CASE WHEN b.cd_sinal_vital = 5  AND b.rn = 1 THEN b.valor END) AS pas_pad,
     MAX(CASE WHEN b.cd_sinal_vital = 11 AND b.rn = 1 THEN b.valor END) AS spo2,
     MAX(CASE WHEN b.cd_sinal_vital = 13 AND b.rn = 1 THEN b.valor END) AS glicemia,
+    MAX(a.cd_cid) AS cd_cid,
+    MAX(cid.ds_cid) AS ds_cid,
+    MAX(prest.nm_prestador) AS medico_solicitante,
     prd.ds_produto AS medicamento
 FROM base b
 LEFT JOIN retornos r
   ON r.cd_paciente = b.cd_paciente
+LEFT JOIN dbamv.atendime a
+  ON a.cd_atendimento = b.cd_atendimento
+LEFT JOIN dbamv.cid cid
+  ON cid.cd_cid = a.cd_cid
 LEFT JOIN dbamv.pre_med pm
   ON pm.cd_atendimento = b.cd_atendimento
+LEFT JOIN dbamv.prestador prest
+  ON prest.cd_prestador = pm.cd_prestador
 LEFT JOIN dbamv.itpre_med ipm
   ON ipm.cd_pre_med = pm.cd_pre_med
   AND NVL(ipm.sn_cancelado, 'N') = 'N'
@@ -278,6 +380,13 @@ def init_db():
             width_ratio REAL NOT NULL,
             height_ratio REAL NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS controle_pacientes (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         atendimento TEXT UNIQUE,
+         status TEXT CHECK(status IN ('pendente', 'vigilancia', 'lancado')) DEFAULT 'pendente',
+         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
     )
@@ -548,15 +657,14 @@ def initialize_oracle_client():
 
 
 def build_oracle_params(attendance_number: str) -> dict:
-    normalized_str = attendance_number.strip()
-
-    # remove zeros à esquerda
-    normalized_str = normalized_str.lstrip("0")
+    raw_value = attendance_number.strip()
+    normalized_str = raw_value.lstrip("0") or "0"
 
     print("DEBUG atendimento:", repr(normalized_str))
 
     return {
-        "attendance_number_str": normalized_str
+        "attendance_number_str": normalized_str,
+        "attendance_number_num": int(normalized_str),  # 🔥 ESSENCIAL
     }
 
 
@@ -580,7 +688,13 @@ def run_oracle_query(query: str, attendance_number: str) -> list[dict]:
 
     try:
         cursor = connection.cursor()
-        cursor.execute(query, params)
+
+        # 🔥 FILTRA SÓ OS PARAMETROS QUE EXISTEM NA QUERY
+        filtered_params = {
+            k: v for k, v in params.items() if f":{k}" in query
+        }
+
+        cursor.execute(query, filtered_params)
 
         rows = cursor.fetchall()
 
@@ -590,31 +704,89 @@ def run_oracle_query(query: str, attendance_number: str) -> list[dict]:
         return [dict(zip(columns, row)) for row in rows]
 
     except Exception as e:
-        print("🔥 ERRO ORACLE:", str(e))  # 👈 AGORA VAI APARECER
+        print("🔥 ERRO ORACLE:", str(e))
         raise
 
     finally:
         connection.close()
 
 
-def fetch_attendance_context(attendance_number: str) -> dict:
+def safe_run_oracle_query(query: str, attendance_number: str, label: str) -> tuple[list[dict], str | None]:
     try:
-        print("DEBUG atendimento:", attendance_number)
-        prescriptions = run_oracle_query(PRESCRIPTION_QUERY, attendance_number)
-        attendance_rows = run_oracle_query(ATTENDANCE_CONTEXT_QUERY, attendance_number)
-        return {
-            "prescriptions": prescriptions,
-            "attendance_rows": attendance_rows,
-            "summary": attendance_rows[0] if attendance_rows else None,
-            "error": None,
-        }
+          return run_oracle_query(query, attendance_number), None
     except Exception as exc:
-        return {
-            "prescriptions": [],
-            "attendance_rows": [],
-            "summary": None,
-            "error": str(exc),
-        }
+           return [], f"{label}: {exc}"
+
+
+def build_cid_label(row: dict | None) -> str | None:
+    if not row:
+        return None
+
+    code = str(row.get("cd_cid") or "").strip()
+    description = str(row.get("ds_cid") or "").strip()
+
+    if code and description:
+        return f"{code} - {description}"
+    if code:
+        return code
+    if description:
+        return description
+    return None
+
+
+def enrich_rows_with_cid(rows: list[dict]) -> list[dict]:
+    enriched_rows = []
+    for row in rows:
+        enriched = dict(row)
+        enriched["cid_label"] = build_cid_label(enriched)
+        enriched_rows.append(enriched)
+    return enriched_rows
+
+
+def fetch_attendance_context(attendance_number: str) -> dict:
+    print("DEBUG atendimento:", attendance_number)
+
+    prescriptions, prescriptions_error = safe_run_oracle_query(
+        PRESCRIPTION_QUERY,
+        attendance_number,
+        "Prescrições",
+    )
+    attendance_rows, attendance_error = safe_run_oracle_query(
+        ATTENDANCE_CONTEXT_QUERY,
+        attendance_number,
+        "Resumo clínico",
+    )
+    lab_exams, lab_error = safe_run_oracle_query(
+        LAB_EXAMS_QUERY,
+        attendance_number,
+        "Exames laboratoriais",
+    )
+    imaging_exams, imaging_error = safe_run_oracle_query(
+        IMAGING_EXAMS_QUERY,
+        attendance_number,
+        "Exames de imagem",
+    )
+
+    prescriptions = enrich_rows_with_cid(prescriptions)
+    attendance_rows = enrich_rows_with_cid(attendance_rows)
+    lab_exams = enrich_rows_with_cid(lab_exams)
+    imaging_exams = enrich_rows_with_cid(imaging_exams)
+
+    summary = attendance_rows[0] if attendance_rows else None
+    if summary:
+        summary = dict(summary)
+        summary["cid_label"] = build_cid_label(summary)
+
+    errors = [error for error in [prescriptions_error, attendance_error, lab_error, imaging_error] if error]
+
+    return {
+        "prescriptions": prescriptions,
+        "attendance_rows": attendance_rows,
+        "lab_exams": lab_exams,
+        "imaging_exams": imaging_exams,
+        "summary": summary,
+        "error": " | ".join(errors) if errors else None,
+    }
 
 
 # --- Rotas ----------------------------------------------------------------
@@ -651,12 +823,104 @@ def logout():
     flash("Sessão encerrada com sucesso.", "info")
     return redirect(url_for("login"))
 
+@app.route("/reports")
+@login_required
+@role_required("admin", "faturamento")
+def reports():
+    inicio = request.args.get("inicio")
+    fim = request.args.get("fim")
+
+    filtro = ""
+
+    if inicio and fim:
+        filtro = f"""
+        AND A.DT_ATENDIMENTO BETWEEN 
+        TO_DATE('{inicio}','YYYY-MM-DD') 
+        AND TO_DATE('{fim}','YYYY-MM-DD')
+        """
+
+    # 🔥 DAILY
+    daily_query = f"""
+    SELECT
+        TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY') AS DATA,
+        COUNT(*) AS TOTAL
+    FROM DBAMV.ATENDIME A
+    WHERE A.TP_ATENDIMENTO = 'U'
+    {filtro}
+    GROUP BY TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY')
+    ORDER BY DATA
+    """
+
+    # 🔥 MONTHLY
+    monthly_query = f"""
+    SELECT
+        TO_CHAR(A.DT_ATENDIMENTO, 'MM/YYYY') AS MES,
+        COUNT(*) AS TOTAL
+    FROM DBAMV.ATENDIME A
+    WHERE A.TP_ATENDIMENTO = 'U'
+    {filtro}
+    GROUP BY TO_CHAR(A.DT_ATENDIMENTO, 'MM/YYYY')
+    ORDER BY MES
+    """
+
+    # 🔥 YEARLY
+    yearly_query = f"""
+    SELECT
+        TO_CHAR(A.DT_ATENDIMENTO, 'YYYY') AS ANO,
+        COUNT(*) AS TOTAL
+    FROM DBAMV.ATENDIME A
+    WHERE A.TP_ATENDIMENTO = 'U'
+    {filtro}
+    GROUP BY TO_CHAR(A.DT_ATENDIMENTO, 'YYYY')
+    ORDER BY ANO
+    """
+
+    # 🔥 DETALHADO (PACIENTES)
+    detalhado_query = f"""
+    SELECT
+        PA.NM_PACIENTE,
+        A.CD_ATENDIMENTO AS NUMERO_ATENDIMENTO,
+        TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY HH24:MI') AS DATA_ATENDIMENTO
+    FROM DBAMV.ATENDIME A
+    LEFT JOIN DBAMV.PACIENTE PA ON PA.CD_PACIENTE = A.CD_PACIENTE
+    WHERE A.TP_ATENDIMENTO = 'U'
+    {filtro}
+    ORDER BY A.DT_ATENDIMENTO DESC
+    """
+
+    daily = run_oracle_query(daily_query, "0")
+    monthly = run_oracle_query(monthly_query, "0")
+    yearly = run_oracle_query(yearly_query, "0")
+    detalhado = run_oracle_query(detalhado_query, "0")
+    # 🔥 PEGAR ATENDIMENTOS COM PDF (SQLite)
+    db = get_db()
+    uploads_db = db.execute("SELECT attendance_number FROM uploads").fetchall()
+
+    uploads_set = {
+        str(u["attendance_number"]).lstrip("0")
+        for u in uploads_db
+}
+
+    # 🔥 MARCAR NO DETALHADO
+    for d in detalhado:
+        d["tem_pdf"] = str(d["numero_atendimento"]).lstrip("0") in uploads_set
+
+    return render_template(
+        "reports.html",
+        daily=daily,
+        monthly=monthly,
+        yearly=yearly,
+        detalhado=detalhado
+    )
+
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
     db = get_db()
     user = current_user()
+
+    # 🔥 ÚLTIMOS UPLOADS
     uploads = db.execute(
         """
         SELECT uploads.id, uploads.original_filename, uploads.attendance_number,
@@ -667,14 +931,49 @@ def dashboard():
         LIMIT 20
         """
     ).fetchall()
+
+    # 🔥 CONTADORES
     user_count = db.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
     upload_count = db.execute("SELECT COUNT(*) AS total FROM uploads").fetchone()["total"]
+
+    # 🔥 PACIENTES (ORACLE)
+    patients_query = """
+    SELECT
+        A.CD_ATENDIMENTO,
+        PA.NM_PACIENTE,
+        TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY HH24:MI') AS DATA
+    FROM DBAMV.ATENDIME A
+    LEFT JOIN DBAMV.PACIENTE PA ON PA.CD_PACIENTE = A.CD_PACIENTE
+    WHERE A.TP_ATENDIMENTO = 'U'
+    AND A.DT_ATENDIMENTO >= SYSDATE - 1
+    ORDER BY A.DT_ATENDIMENTO DESC
+    """
+
+    try:
+        patients = run_oracle_query(patients_query, "0")
+    except Exception as e:
+        print("Erro ao buscar pacientes:", e)
+        patients = []
+
+    # 🔥 PEGAR ATENDIMENTOS QUE JÁ TEM PDF
+    uploads_db = db.execute("SELECT attendance_number FROM uploads").fetchall()
+
+    uploads_set = {
+     str(u["attendance_number"]).lstrip("0")
+     for u in uploads_db
+}
+
+    for p in patients:
+     p["tem_pdf"] = str(p["cd_atendimento"]).lstrip("0") in uploads_set
+
+    # 🔥 RENDER
     return render_template(
         "dashboard.html",
         uploads=uploads,
         user=user,
         user_count=user_count,
         upload_count=upload_count,
+        patients=patients
     )
 
 
@@ -741,6 +1040,8 @@ def attendance_details(attendance_number: str):
         attendance_number=attendance_number,
         prescriptions=context["prescriptions"],
         attendance_rows=context["attendance_rows"],
+        lab_exams=context["lab_exams"],
+        imaging_exams=context["imaging_exams"],
         summary=context["summary"],
         oracle_error=context["error"],
     )
@@ -861,6 +1162,185 @@ def serve_file(relative_path: str):
     file_path = BASE_DIR / relative_path
     return send_from_directory(file_path.parent, file_path.name, as_attachment=True)
 
+@app.route("/controle_pacientes", methods=["GET", "POST"])
+@login_required
+@role_required("faturamento", "admin")
+def controle_pacientes():
+    db = get_db()
+
+    # garantir tabela
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS controle_pacientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        atendimento TEXT UNIQUE,
+        vigilancia INTEGER DEFAULT 0,
+        lancado INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    db.commit()
+
+    cursor = db.execute("PRAGMA table_info(controle_pacientes)")
+    cols = [c[1] for c in cursor.fetchall()]
+
+    if "vigilancia" not in cols:
+        db.execute("ALTER TABLE controle_pacientes ADD COLUMN vigilancia INTEGER DEFAULT 0")
+
+    if "lancado" not in cols:
+     db.execute("ALTER TABLE controle_pacientes ADD COLUMN lancado INTEGER DEFAULT 0")
+
+    db.commit()
+
+    # 🔥 AÇÕES
+    if request.method == "POST":
+        atendimento = request.form.get("atendimento")
+        acao = request.form.get("acao")
+
+        atendimento = str(atendimento).lstrip("0")
+
+        db.execute("""
+            INSERT INTO controle_pacientes (atendimento)
+            VALUES (?)
+            ON CONFLICT(atendimento) DO NOTHING
+        """, (atendimento,))
+
+        if acao == "vigilancia_on":
+            db.execute("UPDATE controle_pacientes SET vigilancia = 1 WHERE atendimento = ?", (atendimento,))
+
+        elif acao == "vigilancia_off":
+            db.execute("UPDATE controle_pacientes SET vigilancia = 0 WHERE atendimento = ?", (atendimento,))
+
+        elif acao == "lancado":
+            db.execute("UPDATE controle_pacientes SET lancado = 1 WHERE atendimento = ?", (atendimento,))
+
+        db.commit()
+        return redirect(url_for("controle_pacientes"))
+
+    # 🔥 PACIENTES
+    query = """
+    SELECT
+        A.CD_ATENDIMENTO,
+        PA.NM_PACIENTE,
+        TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY HH24:MI') AS DATA
+    FROM DBAMV.ATENDIME A
+    LEFT JOIN DBAMV.PACIENTE PA ON PA.CD_PACIENTE = A.CD_PACIENTE
+    WHERE A.TP_ATENDIMENTO = 'U'
+    AND A.DT_ATENDIMENTO >= SYSDATE - 2
+    ORDER BY A.DT_ATENDIMENTO DESC
+    """
+
+    try:
+        pacientes = run_oracle_query(query, "0")
+    except:
+        pacientes = []
+
+    # 🔥 STATUS
+    status_db = db.execute("SELECT * FROM controle_pacientes").fetchall()
+
+    status_map = {
+        str(s["atendimento"]).lstrip("0"): s
+        for s in status_db
+    }
+
+    resultado = []
+
+    for p in pacientes:
+        atendimento = str(p["cd_atendimento"]).lstrip("0")
+        status = status_map.get(atendimento)
+
+        vigilancia = status["vigilancia"] if status and "vigilancia" in status.keys() else 0
+        lancado = status["lancado"] if status and "lancado" in status.keys() else 0
+
+        # 🔥 SE LANÇADO → NÃO MOSTRA
+        if lancado == 1:
+            continue
+
+        p["vigilancia"] = vigilancia
+        p["lancado"] = lancado
+
+        resultado.append(p)
+
+    return render_template(
+        "controle_pacientes.html",
+        pacientes=resultado
+    )
+
+from collections import defaultdict
+
+@app.route("/controle_relatorio")
+@login_required
+@role_required("faturamento", "admin")
+def controle_relatorio():
+    db = get_db()
+
+    # 🔥 GARANTIR TABELA CORRETA
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS controle_pacientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        atendimento TEXT UNIQUE,
+        vigilancia INTEGER DEFAULT 0,
+        lancado INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    db.commit()
+
+    # 🔥 BUSCAR STATUS
+    status_db = db.execute("""
+        SELECT atendimento, vigilancia, lancado
+        FROM controle_pacientes
+    """).fetchall()
+
+    status_map = {
+        str(s["atendimento"]).lstrip("0"): s
+        for s in status_db
+    }
+
+    # 🔥 ORACLE
+    query = """
+    SELECT
+        A.CD_ATENDIMENTO,
+        PA.NM_PACIENTE,
+        TO_CHAR(A.DT_ATENDIMENTO, 'MM/YYYY') AS MES,
+        TO_CHAR(A.DT_ATENDIMENTO, 'DD/MM/YYYY HH24:MI') AS DATA
+    FROM DBAMV.ATENDIME A
+    LEFT JOIN DBAMV.PACIENTE PA ON PA.CD_PACIENTE = A.CD_PACIENTE
+    WHERE A.TP_ATENDIMENTO = 'U'
+    AND A.DT_ATENDIMENTO >= ADD_MONTHS(TRUNC(SYSDATE,'MM'), -3)
+    ORDER BY A.DT_ATENDIMENTO DESC
+    """
+
+    try:
+        pacientes = run_oracle_query(query, "0")
+    except:
+        pacientes = []
+
+    # 🔥 AGRUPAR
+    agrupado = defaultdict(lambda: {
+        "lancados": [],
+        "vigilancia": []
+    })
+
+    for p in pacientes:
+        atendimento = str(p["cd_atendimento"]).lstrip("0")
+        status = status_map.get(atendimento)
+
+        if not status:
+            continue
+
+        mes = p["mes"]
+
+        if status["lancado"] == 1:
+            agrupado[mes]["lancados"].append(p)
+
+        if status["vigilancia"] == 1:
+            agrupado[mes]["vigilancia"].append(p)
+
+    return render_template(
+        "controle_relatorio.html",
+        agrupado=agrupado
+    )
+
 
 @app.route("/uploads/<int:upload_id>/delete", methods=["POST"])
 @login_required
@@ -877,13 +1357,18 @@ def delete_upload(upload_id: int):
         return redirect(url_for("dashboard"))
 
     file_path = BASE_DIR / upload["stored_path"]
+    if not file_path.exists():
+        configured_root = Path(app.config["UPLOAD_ROOT"])
+        fallback_path = configured_root / upload["attendance_number"] / Path(upload["stored_path"]).name
+        if fallback_path.exists():
+            file_path = fallback_path
     if file_path.exists():
         file_path.unlink()
         parent_dir = file_path.parent
         if parent_dir.exists() and not any(parent_dir.iterdir()):
             parent_dir.rmdir()
 
-    db.execute("DELETE FROM uploads WHERE id = ?", (upload_id,))
+    db.execute("DELETE FROM uploads WHERE id = ?", (upload_id,))# 🔥 MARCAR PACIENTES COM PDF
     db.commit()
     flash("Arquivo excluído com sucesso.", "success")
     return redirect(url_for("dashboard"))

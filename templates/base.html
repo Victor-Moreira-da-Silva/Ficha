@@ -4,43 +4,92 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Ficha OCR{% endblock %}</title>
+
+    <!-- Fonte moderna -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Ícones -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   </head>
+
   <body>
     <div class="app-shell">
+
       {% if current_user %}
       <aside class="sidebar">
+
         <div>
-          <h1>Ficha OCR</h1>
-          <p class="muted">Usuário: <strong>{{ current_user['username'] }}</strong></p>
-          <p class="badge">Perfil: {{ current_user['role'] }}</p>
+          <h1><i class="fa-solid fa-file-waveform"></i> Ficha OCR</h1>
+
+          <p class="muted">
+            Usuário: <strong>{{ current_user['username'] }}</strong>
+          </p>
+
+          <p class="badge">
+            Perfil: {{ current_user['role'] }}
+          </p>
         </div>
+
         <nav>
-          <a href="{{ url_for('dashboard') }}">Dashboard</a>
+          <a href="{{ url_for('dashboard') }}">
+            <i class="fa-solid fa-chart-line"></i> Dashboard
+          </a>
+
           {% if current_user['role'] in ['recepcao', 'admin'] %}
-          <a href="{{ url_for('upload_pdf') }}">Enviar PDF</a>
+          <a href="{{ url_for('upload_pdf') }}">
+            <i class="fa-solid fa-upload"></i> Enviar PDF
+          </a>
           {% endif %}
+
           {% if current_user['role'] == 'admin' %}
-          <a href="{{ url_for('manage_users') }}">Usuários</a>
-          <a href="{{ url_for('manage_ocr_settings') }}">Área OCR</a>
+          <a href="{{ url_for('manage_users') }}">
+            <i class="fa-solid fa-users"></i> Usuários
+          </a>
+
+          <a href="/controle_pacientes">
+            <i class="fa-solid fa-hospital-user"></i> Controle
+          </a>
+
+          <a href="/controle_relatorio">
+            <i class="fa-solid fa-file-lines"></i> Relatório
+          </a>
+
+          <a href="{{ url_for('manage_ocr_settings') }}">
+            <i class="fa-solid fa-gear"></i> Área OCR
+          </a>
+
+          <a href="{{ url_for('reports') }}">
+            <i class="fa-solid fa-chart-pie"></i> Relatórios
+          </a>
           {% endif %}
-          <a href="{{ url_for('logout') }}">Sair</a>
+
+          <a href="{{ url_for('logout') }}">
+            <i class="fa-solid fa-right-from-bracket"></i> Sair
+          </a>
         </nav>
+
       </aside>
       {% endif %}
 
       <main class="content {% if not current_user %}content-auth{% endif %}">
+
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <div class="flash-stack">
               {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
+                <div class="flash flash-{{ category }}">
+                  {{ message }}
+                </div>
               {% endfor %}
             </div>
           {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
       </main>
+
     </div>
   </body>
 </html>

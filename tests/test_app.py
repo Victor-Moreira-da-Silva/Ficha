@@ -133,7 +133,7 @@ class FichaAppTestCase(unittest.TestCase):
     def test_build_oracle_params_normalizes_leading_zeros(self):
         params = ficha_app.build_oracle_params("00180627")
 
-        self.assertEqual(params["attendance_number_str"], "00180627")
+        self.assertEqual(params["attendance_number_str"], "180627")
         self.assertEqual(params["attendance_number_num"], 180627)
         self.assertEqual(params["attendance_length"], 8)
 
@@ -204,6 +204,85 @@ class FichaAppTestCase(unittest.TestCase):
         self.login("admin", "admin123")
         response = self.client.get("/admin/users", follow_redirects=True)
         self.assertIn("Cadastro de usuários".encode(), response.data)
+
+    def test_attendance_details_show_requested_exams_doctor_and_cid(self):
+        self.login("admin", "admin123")
+        original_fetch = ficha_app.fetch_attendance_context
+        ficha_app.fetch_attendance_context = lambda _attendance: {
+            "prescriptions": [
+                {
+                    "nm_paciente": "Maria Souza",
+                    "data_hora": "20/03/2026 10:15",
+                    "ds_produto": "Dipirona",
+                    "qt_solicitado": 1,
+                    "cd_cor_referencia": "VERDE",
+                    "cd_for_apl": "VO",
+                    "medico_solicitante": "Dr. João Lima",
+                    "cid_label": "J11 - Influenza",
+                }
+            ],
+            "attendance_rows": [
+                {
+                    "nm_paciente": "Maria Souza",
+                    "cd_paciente": "123",
+                    "dt_atendimento": "20/03/2026",
+                    "classificacao_risco": "VERDE",
+                    "queixa_principal": "Febre",
+                    "temperatura": "37.8",
+                    "frequencia_cardiaca": "80",
+                    "pressao_sistolica": "120",
+                    "pas_pad": "80",
+                    "spo2": "98",
+                    "glicemia": "90",
+                    "medicamento": "Dipirona",
+                    "medico_solicitante": "Dr. João Lima",
+                    "cid_label": "J11 - Influenza",
+                }
+            ],
+            "lab_exams": [
+                {
+                    "nm_paciente": "Maria Souza",
+                    "data_hora": "20/03/2026 10:20",
+                    "exame": "Hemograma",
+                    "medico_solicitante": "Dra. Ana Costa",
+                    "cid_label": "J11 - Influenza",
+                }
+            ],
+            "imaging_exams": [
+                {
+                    "nm_paciente": "Maria Souza",
+                    "data_hora": "20/03/2026 10:30",
+                    "exame": "Raio-X de tórax",
+                    "medico_solicitante": "Dr. Pedro Alves",
+                    "cid_label": "J11 - Influenza",
+                }
+            ],
+            "summary": {
+                "nm_paciente": "Maria Souza",
+                "cd_paciente": "123",
+                "dt_atendimento": "20/03/2026",
+                "classificacao_risco": "VERDE",
+                "queixa_principal": "Febre",
+                "temperatura": "37.8",
+                "frequencia_cardiaca": "80",
+                "pressao_sistolica": "120",
+                "pas_pad": "80",
+                "spo2": "98",
+                "glicemia": "90",
+                "cid_label": "J11 - Influenza",
+            },
+            "error": None,
+        }
+        try:
+            response = self.client.get("/attendance/123456", follow_redirects=True)
+        finally:
+            ficha_app.fetch_attendance_context = original_fetch
+
+        self.assertIn("Exames laboratoriais solicitados".encode(), response.data)
+        self.assertIn("Exames de imagem solicitados".encode(), response.data)
+        self.assertIn("Dr. João Lima".encode(), response.data)
+        self.assertIn("Dra. Ana Costa".encode(), response.data)
+        self.assertIn("J11 - Influenza".encode(), response.data)
 
     def test_faturamento_cannot_access_upload(self):
         self.create_user("fat", "senha123", "faturamento")
