@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import base64
 from functools import wraps
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -21,6 +22,7 @@ from flask import (
     url_for,
 )
 from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -342,6 +344,79 @@ SIGNATURE_BOX_DEFAULT = {
     "width_ratio": 0.56,
     "height_ratio": 0.05,
 }
+
+def format_patient_datetime(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y")
+    text_value = str(value).strip()
+    if not text_value:
+        return ""
+    return text_value
+
+
+def get_patient_value(patient_data, key: str, fallback: str = "-") -> str:
+    if not patient_data:
+        return fallback
+    value = patient_data.get(key) if hasattr(patient_data, "get") else patient_data[key]
+    if value in (None, ""):
+        return fallback
+    return str(value)
+
+
+def generate_signature_base_pdf(attendance_number: str, patient_data, target_pdf_path: Path) -> None:
+    image_width, image_height = 1240, 1754
+    image = Image.new("RGB", (image_width, image_height), "white")
+    draw = ImageDraw.Draw(image)
+    base_font = ImageFont.load_default()
+
+    def line(y_pos, thickness=2):
+        draw.rectangle((40, y_pos, image_width - 40, y_pos + thickness), fill="black")
+
+    draw.text((40, 30), "FILIAL - PRONTO SOCORRO MUN PORTO FELIZ", fill="black", font=base_font)
+    draw.text((40, 54), "GOVERNADOR MARIO COVAS - PORTO FELIZ - SP", fill="black", font=base_font)
+    draw.text((560, 120), "FICHA DE ATENDIMENTO", fill="black", font=base_font)
+    draw.text((920, 60), "|||| ||| |||| |||| |||", fill="black", font=base_font)
+    draw.text((900, 84), attendance_number, fill="black", font=base_font)
+
+    line(180, 8)
+    line(238, 8)
+    line(520, 8)
+
+    draw.text((40, 200), f"ATENDIMENTO: {attendance_number}", fill="black", font=base_font)
+    draw.text((380, 200), f"DATA DA ENTRADA: {format_patient_datetime(get_patient_value(patient_data, 'dt_atendimento', ''))}", fill="black", font=base_font)
+    draw.text((760, 200), f"HORA: {get_patient_value(patient_data, 'hr_atendimento', '-')}", fill="black", font=base_font)
+
+    draw.text((40, 270), f"PRONTUÁRIO: {get_patient_value(patient_data, 'nr_same', '-')}", fill="black", font=base_font)
+    draw.text((520, 270), f"CNS: {get_patient_value(patient_data, 'nr_cns', '-')}", fill="black", font=base_font)
+    draw.text((40, 300), f"PACIENTE: {get_patient_value(patient_data, 'nm_paciente', '-')}", fill="black", font=base_font)
+    draw.text((40, 330), f"SEXO: {get_patient_value(patient_data, 'tp_sexo', '-')}", fill="black", font=base_font)
+    draw.text((520, 330), f"DATA DE NASCIMENTO: {format_patient_datetime(get_patient_value(patient_data, 'dt_nascimento', ''))}", fill="black", font=base_font)
+    draw.text((920, 330), "IDADE: -", fill="black", font=base_font)
+    draw.text((40, 360), f"CPF: {get_patient_value(patient_data, 'nr_cpf', '-')}", fill="black", font=base_font)
+    draw.text((40, 390), f"ENDEREÇO: {get_patient_value(patient_data, 'ds_endereco', '-')} {get_patient_value(patient_data, 'nr_endereco', '')}", fill="black", font=base_font)
+    draw.text((40, 420), f"CIDADE/BAIRRO: {get_patient_value(patient_data, 'nm_bairro', '-')}", fill="black", font=base_font)
+    draw.text((850, 420), f"CEP: {get_patient_value(patient_data, 'nr_cep', '-')}", fill="black", font=base_font)
+    draw.text((40, 450), f"TELEFONE: {get_patient_value(patient_data, 'nr_fone', '-')}", fill="black", font=base_font)
+    draw.text((40, 480), f"FILIAÇÃO: {get_patient_value(patient_data, 'nm_mae', '-')} / {get_patient_value(patient_data, 'nm_pai', '-')}", fill="black", font=base_font)
+
+    draw.text((390, 560), "TERMO DE RESPONSABILIDADE E CONSENTIMENTO", fill="black", font=base_font)
+    draw.multiline_text(
+        (40, 600),
+        "1 - Autorizo os procedimentos necessários ao meu atendimento.\n"
+        "2 - Declaro estar ciente das orientações médicas e da documentação apresentada.\n"
+        "3 - O hospital não se responsabiliza por objetos pessoais.",
+        fill="black",
+        font=base_font,
+        spacing=8,
+    )
+    draw.text((70, 1110), "Assin Paciente ou Responsável: ________________________________", fill="black", font=base_font)
+
+    target_pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(target_pdf_path, "PDF", resolution=300.0)
+
+
 
 def resolve_tesseract_cmd() -> str | None:
     configured = os.environ.get("TESSERACT_CMD", "").strip()
@@ -1107,7 +1182,6 @@ def upload_pdf():
     patient_data = None
 
     if selected_attendance:
-        selected_upload = find_latest_upload_for_attendance(selected_attendance)
         patient_rows, _ = safe_run_oracle_query(
             ONLINE_SIGNATURE_QUERY,
             selected_attendance,
@@ -1115,6 +1189,13 @@ def upload_pdf():
         )
         patient_data = patient_rows[0] if patient_rows else None
 
+        preview_path = Path(app.config["UPLOAD_ROOT"]) / selected_attendance / f"{selected_attendance}-signature-base.pdf"
+        generate_signature_base_pdf(selected_attendance, patient_data, preview_path)
+        selected_upload = {
+            "stored_path": to_stored_path(preview_path, selected_attendance),
+            "attendance_number": selected_attendance,
+        }
+        
     if request.method == "POST":
         action = request.form.get("action", "upload_pdf")
 

@@ -25,7 +25,7 @@
       <span class="eyebrow">Assinatura eletrônica</span>
       <h2>Assinar documento no tablet/celular</h2>
     </div>
-    <p class="muted">Digite o número do atendimento para carregar o PDF já enviado. O paciente pode assinar com o dedo/caneta, e o sistema salva um novo PDF no mesmo fluxo do upload.</p>
+    <p class="muted">Digite o número do atendimento para gerar uma ficha de assinatura. O paciente pode assinar com o dedo/caneta, e o sistema salva um novo PDF assinado.</p>
   </div>
 
   <form method="get" action="{{ url_for('upload_pdf') }}" class="form-grid signature-find-form">
@@ -68,7 +68,7 @@
         </div>
       </div>
     {% else %}
-      <p class="empty-state">Nenhum PDF base foi encontrado para o atendimento informado.</p>
+      <p class="empty-state">Não foi possível gerar a ficha de assinatura para este atendimento.</p>
     {% endif %}
   {% endif %}
 </section>
