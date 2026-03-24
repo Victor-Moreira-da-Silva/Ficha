@@ -1116,18 +1116,58 @@ def upload_pdf():
         patient_data = patient_rows[0] if patient_rows else None
 
     if request.method == "POST":
-        selected_attendance = request.args.get("atendimento", "").strip()
-    selected_upload = None
-    patient_data = None
+        action = request.form.get("action", "upload_pdf")
 
-    if selected_attendance:
-        selected_upload = find_latest_upload_for_attendance(selected_attendance)
-        patient_rows, _ = safe_run_oracle_query(
-            ONLINE_SIGNATURE_QUERY,
-            selected_attendance,
-            "Dados do paciente",
-        )
-        patient_data = patient_rows[0] if patient_rows else None
+        if action == "online_signature":
+            attendance_number = request.form.get("attendance_number", "").strip()
+            signature_data = request.form.get("signature_data", "")
+
+            if not attendance_number:
+                flash("Informe o número do atendimento para assinar.", "danger")
+                return redirect(url_for("upload_pdf"))
+
+            source_upload = find_latest_upload_for_attendance(attendance_number)
+            if not source_upload:
+                flash("Nenhum PDF base foi encontrado para o atendimento informado.", "danger")
+                return redirect(url_for("upload_pdf", atendimento=attendance_number))
+
+            source_pdf_path = BASE_DIR / source_upload["stored_path"]
+            if not source_pdf_path.exists():
+                configured_root = Path(app.config["UPLOAD_ROOT"])
+                source_fallback = (
+                    configured_root
+                    / source_upload["attendance_number"]
+                    / Path(source_upload["stored_path"]).name
+                )
+                if source_fallback.exists():
+                    source_pdf_path = source_fallback
+            if not source_pdf_path.exists():
+                flash("O PDF base do atendimento não foi encontrado no armazenamento.", "danger")
+                return redirect(url_for("upload_pdf", atendimento=attendance_number))
+
+            signed_path = build_storage_path(attendance_number)
+            try:
+                merge_signature_into_pdf(source_pdf_path, signed_path, signature_data)
+                get_db().execute(
+                    """
+                    INSERT INTO uploads (original_filename, stored_path, attendance_number, uploaded_by)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        f"assinado-{source_pdf_path.name}",
+                        to_stored_path(signed_path, attendance_number),
+                        attendance_number,
+                        current_user()["id"],
+                    ),
+                )
+                get_db().commit()
+                flash("Documento assinado e enviado com sucesso.", "success")
+            except Exception as exc:
+                if signed_path.exists():
+                    signed_path.unlink()
+                flash(str(exc), "danger")
+
+            return redirect(url_for("upload_pdf", atendimento=attendance_number))
 
         if "pdf_file" not in request.files:
             flash("Selecione um arquivo PDF.", "danger")
