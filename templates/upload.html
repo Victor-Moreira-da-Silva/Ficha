@@ -100,8 +100,8 @@
 
     function getPoint(event) {
       const rect = canvas.getBoundingClientRect();
-      const touch = event.touches ? event.touches[0] : event;
-      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+      const source = event.touches ? event.touches[0] : event;
+      return { x: source.clientX - rect.left, y: source.clientY - rect.top };
     }
 
     function start(event) {
@@ -132,13 +132,41 @@
       hasDrawn = false;
       hiddenInput.value = "";
     }
+    
+     function startPointer(event) {
+      if (typeof event.button === "number" && event.button !== 0) return;
+      canvas.setPointerCapture(event.pointerId);
+      start(event);
+    }
 
-    canvas.addEventListener("mousedown", start);
-    canvas.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", end);
-    canvas.addEventListener("touchstart", start, { passive: false });
-    canvas.addEventListener("touchmove", move, { passive: false });
-    canvas.addEventListener("touchend", end, { passive: false });
+    function movePointer(event) {
+      move(event);
+    }
+
+    function endPointer(event) {
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      end(event);
+    }
+
+    const supportsPointer = typeof window.PointerEvent !== "undefined";
+    if (supportsPointer) {
+      canvas.addEventListener("pointerdown", startPointer);
+      canvas.addEventListener("pointermove", movePointer);
+      canvas.addEventListener("pointerup", endPointer);
+      canvas.addEventListener("pointercancel", endPointer);
+      canvas.addEventListener("pointerleave", endPointer);
+    } else {
+      canvas.addEventListener("mousedown", start);
+      canvas.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", end);
+      canvas.addEventListener("touchstart", start, { passive: false });
+      canvas.addEventListener("touchmove", move, { passive: false });
+      canvas.addEventListener("touchend", end, { passive: false });
+    }
+
+
     clearButton.addEventListener("click", clear);
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();

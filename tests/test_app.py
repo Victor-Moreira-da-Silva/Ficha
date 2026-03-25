@@ -134,6 +134,7 @@ class FichaAppTestCase(unittest.TestCase):
         params = ficha_app.build_oracle_params("00180627")
         
         self.assertEqual(params["attendance_number"], 180627)
+        self.assertEqual(params["attendance_number"], 180627)
         self.assertEqual(params["attendance_number_str"], "180627")
         self.assertEqual(params["attendance_number_num"], 180627)
         self.assertEqual(params["attendance_length"], 8)
