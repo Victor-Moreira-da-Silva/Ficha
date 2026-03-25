@@ -344,6 +344,7 @@ SIGNATURE_BOX_DEFAULT = {
     "width_ratio": 0.56,
     "height_ratio": 0.05,
 }
+PDF_EXPORT_DPI = 150
 
 def format_patient_datetime(value) -> str:
     if value is None:
@@ -432,7 +433,7 @@ def generate_signature_base_pdf(attendance_number: str, patient_data, target_pdf
     draw.text((70, 1110), "Assin Paciente ou Responsável: ________________________________", fill="black", font=base_font)
 
     target_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(target_pdf_path, "PDF", resolution=300.0)
+    image.save(target_pdf_path, "PDF", resolution=PDF_EXPORT_DPI)
 
 
 
@@ -981,7 +982,7 @@ def merge_signature_into_pdf(
     pages[0].save(
         target_pdf_path,
         "PDF",
-        resolution=300.0,
+        resolution=PDF_EXPORT_DPI,
         save_all=True,
         append_images=pages[1:],
     )
