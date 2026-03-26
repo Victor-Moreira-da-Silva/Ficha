@@ -139,6 +139,14 @@ class FichaAppTestCase(unittest.TestCase):
         self.assertEqual(params["attendance_number_num"], 180627)
         self.assertEqual(params["attendance_length"], 8)
 
+    def test_bind_param_regex_avoids_prefix_collisions(self):
+        query = "SELECT 1 FROM dual WHERE x = :attendance_number_num"
+        bind_names = set(ficha_app.BIND_PARAM_PATTERN.findall(query))
+
+        self.assertIn("attendance_number_num", bind_names)
+        self.assertNotIn("attendance_number", bind_names)
+
+
     def test_extract_attendance_number_prioritizes_focused_area_before_ocr(self):
         original_text_layer = ficha_app.extract_text_layer_from_pdf
         original_ocr = ficha_app.extract_text_with_ocr

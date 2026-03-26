@@ -344,7 +344,8 @@ SIGNATURE_BOX_DEFAULT = {
     "width_ratio": 0.56,
     "height_ratio": 0.05,
 }
-PDF_EXPORT_DPI = 150
+PDF_EXPORT_DPI = 96
+BIND_PARAM_PATTERN = re.compile(r":([A-Za-z_][A-Za-z0-9_]*)")
 
 def format_patient_datetime(value) -> str:
     if value is None:
@@ -955,11 +956,17 @@ def merge_signature_into_pdf(
 
     pdf = pdfium.PdfDocument(str(source_pdf_path))
     pages = []
+    output_resolution = float(PDF_EXPORT_DPI)
+
     try:
         for page_index in range(len(pdf)):
             page = pdf[page_index]
             bitmap = page.render(scale=2)
             page_image = bitmap.to_pil().convert("RGB")
+            page_width_pt, _page_height_pt = page.get_size()
+
+            if page_index == 0 and page_width_pt:
+                output_resolution = max(72.0, float(page_image.width) * 72.0 / float(page_width_pt))
 
             if page_index == signature_box["page_index"]:
                 overlay = Image.new("RGBA", page_image.size, (255, 255, 255, 0))
@@ -982,7 +989,7 @@ def merge_signature_into_pdf(
     pages[0].save(
         target_pdf_path,
         "PDF",
-        resolution=PDF_EXPORT_DPI,
+        resolution=output_resolution,
         save_all=True,
         append_images=pages[1:],
     )
@@ -1037,10 +1044,8 @@ def run_oracle_query(query: str, attendance_number: str) -> list[dict]:
     try:
         cursor = connection.cursor()
 
-        # 🔥 FILTRA SÓ OS PARAMETROS QUE EXISTEM NA QUERY
-        filtered_params = {
-            k: v for k, v in params.items() if f":{k}" in query
-        }
+        bind_names = set(BIND_PARAM_PATTERN.findall(query))
+        filtered_params = {k: v for k, v in params.items() if k in bind_names}
 
         cursor.execute(query, filtered_params)
 

@@ -132,7 +132,12 @@
       hasDrawn = false;
       hiddenInput.value = "";
     }
-    
+
+    canvas.addEventListener("pointerdown", start);
+    canvas.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+
      function startPointer(event) {
       if (typeof event.button === "number" && event.button !== 0) return;
       canvas.setPointerCapture(event.pointerId);
@@ -163,7 +168,7 @@
       window.addEventListener("mouseup", end);
       canvas.addEventListener("touchstart", start, { passive: false });
       canvas.addEventListener("touchmove", move, { passive: false });
-      canvas.addEventListener("touchend", end, { passive: false });
+      window.addEventListener("touchend", end, { passive: false });
     }
 
 
