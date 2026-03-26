@@ -134,6 +134,12 @@ section + section {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
+.pdf-preview-panel {
+  display: grid;
+  gap: 10px;
+}
+
+
 .stat-card strong {
   display: block;
   font-size: 2rem;
@@ -216,13 +222,27 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
+.pdf-preview-panel {
+  display: grid;
+  gap: 10px;
+}
+
 .pdf-preview {
   width: 100%;
-  min-height: 520px;
+  min-height: 820px;
+  height: 80vh;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: #fff;
 }
+
+@media (max-width: 1024px) {
+  .pdf-preview {
+    min-height: 680px;
+    height: 72vh;
+  }
+}
+
 
 #signature-pad {
   width: 100%;

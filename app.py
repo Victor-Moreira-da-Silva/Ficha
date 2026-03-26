@@ -345,6 +345,8 @@ SIGNATURE_BOX_DEFAULT = {
     "height_ratio": 0.05,
 }
 PDF_EXPORT_DPI = 96
+SIGNATURE_BASE_PDF_DPI = 150
+SIGNED_PDF_RENDER_SCALE = 4
 BIND_PARAM_PATTERN = re.compile(r":([A-Za-z_][A-Za-z0-9_]*)")
 
 def format_patient_datetime(value) -> str:
@@ -434,7 +436,7 @@ def generate_signature_base_pdf(attendance_number: str, patient_data, target_pdf
     draw.text((70, 1110), "Assin Paciente ou Responsável: ________________________________", fill="black", font=base_font)
 
     target_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(target_pdf_path, "PDF", resolution=PDF_EXPORT_DPI)
+    image.save(target_pdf_path, "PDF", resolution=SIGNATURE_BASE_PDF_DPI)
 
 
 
@@ -849,7 +851,7 @@ def extract_text_with_ocr(pdf_path: Path, focused: bool = False) -> str:
     try:
         for page_index in range(len(pdf)):
             page = pdf[page_index]
-            bitmap = page.render(scale=2)
+            bitmap = page.render(scale=SIGNED_PDF_RENDER_SCALE)
             image = bitmap.to_pil()
             if focused:
                 left, top, right, bottom = get_focused_image_bounds(*image.size)
@@ -929,6 +931,21 @@ def find_latest_upload_for_attendance(attendance_number: str):
             return upload
     return None
 
+def find_latest_signed_upload_for_attendance(attendance_number: str):
+    normalized = normalize_attendance_number(attendance_number)
+    uploads = get_db().execute(
+        """
+        SELECT id, original_filename, stored_path, attendance_number, created_at
+        FROM uploads
+        ORDER BY created_at DESC
+        """
+    ).fetchall()
+    for upload in uploads:
+        if normalize_attendance_number(upload["attendance_number"]) != normalized:
+            continue
+        if str(upload["original_filename"]).lower().startswith("assinado-"):
+            return upload
+    return None
 
 def decode_signature_data(signature_data_url: str):
     if not signature_data_url or "," not in signature_data_url:
@@ -961,7 +978,7 @@ def merge_signature_into_pdf(
     try:
         for page_index in range(len(pdf)):
             page = pdf[page_index]
-            bitmap = page.render(scale=2)
+            bitmap = page.render(scale=SIGNED_PDF_RENDER_SCALE)
             page_image = bitmap.to_pil().convert("RGB")
             page_width_pt, _page_height_pt = page.get_size()
 
@@ -1336,6 +1353,7 @@ def dashboard():
 def upload_pdf():
     selected_attendance = request.args.get("atendimento", "").strip()
     selected_upload = None
+    selected_signed_upload = None
     patient_data = None
 
     if selected_attendance:
@@ -1353,6 +1371,8 @@ def upload_pdf():
             "attendance_number": selected_attendance,
         }
         
+        selected_signed_upload = find_latest_signed_upload_for_attendance(selected_attendance)
+
     if request.method == "POST":
         action = request.form.get("action", "upload_pdf")
 
@@ -1466,6 +1486,7 @@ def upload_pdf():
         "upload.html",
         selected_attendance=selected_attendance,
         selected_upload=selected_upload,
+        selected_signed_upload=selected_signed_upload,
         patient_data=patient_data,
          signature_box=get_signature_box_settings(),
     )
